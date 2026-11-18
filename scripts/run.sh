@@ -12,6 +12,7 @@
 #        DELAY        seconds to wait before launching (default: 0)
 #        TIMEOUT_MIN  give up waiting after this many minutes (default: 120)
 #        WORKER_RETRIES  re-run a worker that exits non-zero this many times (default: 1)
+#        ONLY         space-separated worker names to run (default: all worktrees)
 set -uo pipefail
 
 ORCH=$(cd "${1:?usage: run.sh <orch-dir>}" && pwd)
@@ -22,7 +23,11 @@ TIMEOUT_MIN=${TIMEOUT_MIN:-120}
 
 names=()
 for d in "$ORCH"/*/; do
-  [ -f "$d/.git" ] && names+=("$(basename "$d")")
+  [ -f "$d/.git" ] || continue
+  n=$(basename "$d")
+  # ONLY="a b" re-runs just those workers (e.g. a fix round); logs are appended, not replaced.
+  if [ -n "${ONLY:-}" ] && [[ " $ONLY " != *" $n "* ]]; then continue; fi
+  names+=("$n")
 done
 [ ${#names[@]} -gt 0 ] || { echo "no worktrees in $ORCH (run setup.sh)" >&2; exit 1; }
 
@@ -34,7 +39,7 @@ if [ "$MODE" = auto ]; then
 fi
 
 mkdir -p "$ORCH/.status" "$ORCH/logs" "$ORCH/.run"
-for n in "${names[@]}"; do rm -f "$ORCH/.status/$n.exit"; : > "$ORCH/logs/$n.log"; done
+for n in "${names[@]}"; do rm -f "$ORCH/.status/$n.exit"; [ -z "${ONLY:-}" ] && : > "$ORCH/logs/$n.log"; done
 
 # One runner script per worker so exit codes are captured the same way in every mode.
 for n in "${names[@]}"; do
