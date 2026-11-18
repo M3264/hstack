@@ -2,7 +2,7 @@
 
 **Big models plan. Small models build. Big models verify.**
 
-hstack is an agent skill that turns a frontier model into an engineering lead. Instead of writing every line itself, the large model writes the spec, splits the work, and directs a team of smaller, cheaper coding agents running in parallel. Then it checks their work against real tests and real services before anything is merged.
+hstack is a collection of agent skills that turns a frontier model into an engineering lead. Instead of writing every line itself, the large model writes the spec, splits the work, and directs a team of smaller, cheaper coding agents running in parallel. Then it checks their work against real tests and real services before anything is merged.
 
 You get frontier-level judgment on the parts that need it (architecture, contracts, review, security) and small-model prices on the part that costs the most tokens: writing the code.
 
@@ -75,7 +75,7 @@ None of these were visible to the workers' own test suites. That's the case for 
 
 hstack pays off on **large, well-specified, parallel** work: features of roughly 500+ lines, test suites, and mechanical refactors across many files. For those, the orchestrator writes instructions and reads diffs instead of generating code.
 
-These are estimates, not measurements. For a big task that succeeds on the first pass, the orchestrator itself should use roughly **70–80% fewer tokens** than building it alone. With one fix round that drops to around 40–55%. On small or tightly coupled changes, delegation costs more than doing it directly, and the skill tells the orchestrator to say so.
+These are estimates, not measurements. For a big task that succeeds on the first pass, the orchestrator itself should use roughly **70–80% fewer tokens** than building it alone. With one fix round that drops to around 40–55%. On small or tightly coupled changes, delegation costs more than doing it directly, and the skills tell the orchestrator to say so.
 
 ## Supported pairs
 
@@ -90,24 +90,32 @@ Roadmap:
 - **In-harness orchestration.** In harnesses that can run several models themselves, the large model will spawn and direct the smaller ones directly, with no external CLI.
 - Measured per-run cost reports, comparing the orchestrator's and workers' token use with a single-model baseline.
 
+## The skills
+
+| Skill | Role |
+|---|---|
+| [`hstack`](skills/hstack/SKILL.md) | Entry point. Decides whether delegation is worth it and runs the whole flow through the skills below. |
+| [`hstack-plan`](skills/hstack-plan/SKILL.md) | Spec, frozen contracts and stubs, and one precise task file per worker. |
+| [`hstack-run`](skills/hstack-run/SKILL.md) | Isolated worktrees, one visible worker per package, live progress, a background wait with no polling, clean restarts. |
+| [`hstack-verify`](skills/hstack-verify/SKILL.md) | Lane checks, per-worker checks, merge, production build, real end-to-end test, security review, report. |
+
+Each skill works on its own (for example, `hstack-verify` can review any delegated code), and together they form the full loop. Shared `scripts/` and `templates/` live at the repo root.
+
 ## Install
 
-hstack is a folder with `SKILL.md` (standard Agent Skills format), `scripts/` and `templates/`.
+Clone once, then link every skill into your harness:
 
 ```bash
-# Claude Code (user-wide; or put it in .claude/skills/ inside a project)
-git clone https://github.com/shellhaki/hstack ~/.claude/skills/hstack
+git clone https://github.com/shellhaki/hstack ~/hstack
+cd ~/hstack
 
-# Codex CLI
-git clone https://github.com/shellhaki/hstack ~/.codex/skills/hstack
-
-# Muse Code
-git clone https://github.com/shellhaki/hstack ~/.config/muse/skills/hstack
-
-chmod +x ~/.claude/skills/hstack/scripts/*.sh   # adjust the path to where you cloned it
+./install.sh claude     # ~/.claude/skills
+./install.sh codex      # ~/.codex/skills
+./install.sh muse       # ~/.config/muse/skills
+./install.sh <dir>      # any other harness's skills folder
 ```
 
-Any other agent: clone it anywhere and tell it to "follow `<path>/SKILL.md`".
+The skills are symlinks, so `git -C ~/hstack pull` updates all of them. For a harness without a skills folder, tell the agent to "follow `~/hstack/skills/hstack/SKILL.md`".
 
 **Requirements:** `git`, `bash`, and the worker CLI on your `PATH` (`muse` by default). Optional: macOS Terminal for visible windows, or `tmux`.
 
@@ -117,7 +125,7 @@ Ask your orchestrator in plain language:
 
 > Use hstack to build email sign-in with likes and comments. Write the plan in `specs/` first, then orchestrate Muse workers and verify everything before merging.
 
-The skill walks the orchestrator through planning, briefing, launching, verifying and reporting. You'll see one window per worker and a live progress view, and get one final report.
+The `hstack` skill walks the orchestrator through `hstack-plan`, `hstack-run` and `hstack-verify`. You'll see one window per worker and a live progress view, and get one final report.
 
 ### Scripts
 
