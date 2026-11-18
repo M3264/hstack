@@ -1,9 +1,9 @@
 ---
-name: musestack
-description: Orchestrate several cheaper coding agents (Muse Code by default, or any CLI agent) working in parallel on a big, well-specified task. The orchestrating agent writes the spec, contracts and task files, launches one agent per work package in isolated git worktrees (visible terminal windows on macOS, tmux elsewhere), waits without polling, then verifies, merges and reports. Use when the user asks to delegate, orchestrate, fan out or "spawn agents" for a large feature, test suite or refactor. Do not use for small or tightly coupled changes.
+name: hstack
+description: hstack lets a large model orchestrate smaller, cheaper coding agents (Muse Code by default, or any CLI agent) working in parallel on a big, well-specified task. The orchestrating agent writes the spec, contracts and task files, launches one agent per work package in isolated git worktrees (visible terminal windows on macOS, tmux elsewhere), waits without polling, then verifies, merges and reports. Use when the user asks to delegate, orchestrate, fan out or "spawn agents" for a large feature, test suite or refactor. Do not use for small or tightly coupled changes.
 ---
 
-# Muse Stack
+# hstack
 
 You (the orchestrator) plan, split, launch, wait, verify and merge. Worker agents write the code. You never write the bulk of the code yourself; you only fix small issues found in review.
 
