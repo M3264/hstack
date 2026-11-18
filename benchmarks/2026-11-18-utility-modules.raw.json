@@ -1,0 +1,50 @@
+{
+ "solo": {
+  "input": 12,
+  "cache_write_5m": 0,
+  "cache_write_1h": 39957,
+  "cache_read": 264408,
+  "output": 17192,
+  "helper_models_cost": 0.00013800000000000002,
+  "cost": 0.7166,
+  "cli_reported_cost_cumulative": 0.7165636000000001,
+  "turns": 11,
+  "duration_s": 174
+ },
+ "hstack_plan": {
+  "input": 20,
+  "cache_write_5m": 0,
+  "cache_write_1h": 50464,
+  "cache_read": 538108,
+  "output": 20448,
+  "helper_models_cost": 0.00026880000000000003,
+  "cost": 0.9206,
+  "cli_reported_cost_cumulative": 0.9206424000000001,
+  "turns": 12,
+  "duration_s": 245
+ },
+ "hstack_verify": {
+  "input": 10,
+  "cache_write_5m": 0,
+  "cache_write_1h": 13215,
+  "cache_read": 397703,
+  "output": 3080,
+  "helper_models_cost": 0.00026880000000000003,
+  "cost": 0.2472,
+  "cli_reported_cost_cumulative": 1.167543,
+  "turns": 5,
+  "duration_s": 37
+ },
+ "muse": {
+  "input": 2081827,
+  "cached": 1856040,
+  "output": 48223,
+  "reasoning": 26724,
+  "runs": 4,
+  "cost": 0.04128018
+ },
+ "solo_acceptance": "33/33 passed, tsc ok",
+ "hstack_acceptance": "33/33 passed, tsc ok",
+ "solo_wall_s": 177,
+ "hstack_wall_s": 529
+}

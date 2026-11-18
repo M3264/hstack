@@ -45,6 +45,27 @@ Put them in the repo (e.g. `specs/tasks/`) so the snapshot copies them into ever
   - report path `.orch/<name>.report.md`
 - `<name>.owns` (optional): one glob per line of allowed paths. `collect.sh` flags anything else, and tests next to the code are always allowed.
 
+## Keep briefs thin when the spec is already precise
+
+Your output tokens are the most expensive thing in the whole run. If the spec already passes `templates/brief-checklist.md` (exact signatures, input-to-output examples, states), do **not** restate it per worker. A task file can be short:
+- what it owns
+- "implement section N of `<spec>`; every example there is a required test"
+- the definition-of-done commands
+- anything the spec leaves out
+
+Restating a 900-word spec as 4,300 words of briefs is what made benchmark 1 cost more than doing the work directly. Write detail only where the spec is vague.
+
+## Be specific: small models guess
+
+A worker implements exactly what the brief says, and guesses at everything it doesn't say. Vague briefs ship plausible bugs. Before launch, run every task file through `templates/brief-checklist.md`. At minimum:
+- **Examples, not intentions.** Give input and exact output for anything that leaves the app (URLs, emails, dates, files). Write "`/posts/abc` copies `https://site.dev/posts/abc`", not "copies the link".
+- **A state table for every interactive element:** trigger, what the user sees, what a screen reader hears, duration and what comes next. Success and failure both need visible feedback, and failure must never say success.
+- **When values are computed:** at click time, at render, or on the server.
+- **Real environment facts** the worker can't discover through mocks.
+- **One named test per state row and per example.**
+
+If you catch yourself writing "handle", "properly", "nice UX" or "appropriate feedback", replace it with the concrete states and values.
+
 ## Prompting rules that matter
 
 - Point to exact files and doc pages. "Read the docs" makes workers slow.

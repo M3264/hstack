@@ -6,7 +6,9 @@
 # Env:   AGENT_CMD    worker command, {prompt} is replaced by the task file path
 #                     (default: muse exec --prompt-file {prompt})
 #        TASKS_DIR    task files dir inside each worktree (default: specs/tasks); prompt = $TASKS_DIR/<name>.md
-#        MODE         terminal (macOS Terminal windows) | tmux | headless (default: auto)
+#        MODE         progress (macOS: workers headless + one Terminal progress window, default)
+#                     | windows (macOS: one Terminal window per worker + progress window)
+#                     | tmux | headless (default: auto)
 #        DELAY        seconds to wait before launching (default: 0)
 #        TIMEOUT_MIN  give up waiting after this many minutes (default: 120)
 set -uo pipefail
@@ -25,7 +27,7 @@ done
 
 MODE=${MODE:-auto}
 if [ "$MODE" = auto ]; then
-  if [ "$(uname)" = Darwin ] && command -v osascript >/dev/null; then MODE=terminal
+  if [ "$(uname)" = Darwin ] && command -v osascript >/dev/null; then MODE=progress
   elif command -v tmux >/dev/null; then MODE=tmux
   else MODE=headless; fi
 fi
@@ -64,7 +66,12 @@ EOF
 }
 
 case "$MODE" in
-  terminal)
+  progress)
+    for n in "${names[@]}"; do nohup bash "$ORCH/.run/$n.sh" >/dev/null 2>&1 & done
+    read -r _ _ SW SH < <(osascript -e 'tell application "Finder" to get bounds of window of desktop' | tr -d ',')
+    osa_window "orch progress" "bash '$HERE/progress.sh' '$ORCH'" $(( SW / 10 )) 40 $(( SW * 8 / 10 )) $(( SH * 9 / 10 ))
+    ;;
+  windows|terminal)
     read -r _ _ SW SH < <(osascript -e 'tell application "Finder" to get bounds of window of desktop' | tr -d ',')
     count=${#names[@]}; cols=$(( count > 1 ? 2 : 1 )); rows=$(( (count + cols - 1) / cols ))
     w=$(( SW / cols )); h=$(( (SH - 25) / rows ))
@@ -100,7 +107,7 @@ done
 
 pkill -f "progress.sh $ORCH" 2>/dev/null
 pkill -f "progress.sh '$ORCH'" 2>/dev/null
-if [ "$MODE" = terminal ]; then
+if [ "$MODE" = progress ] || [ "$MODE" = windows ] || [ "$MODE" = terminal ]; then
   osascript <<'EOF' >/dev/null 2>&1
 tell application "Terminal"
   set ids to {}

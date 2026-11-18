@@ -32,17 +32,19 @@ DELAY=0 TASKS_DIR=specs/tasks "$HSTACK/scripts/run.sh" <orch-dir>
   - default: `muse exec --prompt-file {prompt}`
   - examples: `claude -p "$(cat {prompt})"`, `codex exec "$(cat {prompt})"`
   - add flags such as `--reasoning-effort medium` for speed
-- `MODE=terminal|tmux|headless` overrides the automatic choice. Use `TIMEOUT_MIN` to cap the wait.
+- `MODE` picks how workers run. The default on macOS is `progress`: workers run headless, and one Terminal window shows the live progress of all of them. `windows` adds one window per worker (closing one kills that worker), and `tmux` and `headless` are the other options. Use `TIMEOUT_MIN` to cap the wait.
 
 ## Restarting cleanly
 
-Closing a worker's window kills that worker, so ask the user before closing anything. To restart:
+In `windows` mode, closing a worker's window kills that worker, so ask the user before closing anything. Closing the progress window never stops workers. To restart:
 1. Stop the background wait job, then kill the worker processes.
 2. Inside each worktree, run `git reset --hard && git clean -fd`. This keeps symlinks and ignored files.
 3. Clear `<orch>/.status/*.exit` and `<orch>/logs/*.log`, removing each file by explicit path.
 4. Re-copy any task files you edited, then launch again.
 
 ## Pitfalls
+
+- In `windows` mode a worker's Terminal window can silently fail to open. The worker then never starts, and the wait hangs on it. `progress` mode, the default, avoids this. If it happens anyway, start the missing worker yourself with `nohup bash <orch>/.run/<name>.sh &`, and the running wait picks it up.
 
 - Headless worker CLIs often print nothing until they finish. The progress view shows files being written instead.
 - New terminals may print errors from the user's shell startup files. That noise is harmless, so tell the user so they don't worry.

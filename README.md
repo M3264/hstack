@@ -52,7 +52,7 @@ The expensive part of agentic coding is output tokens: generating code, re-readi
 1. **Plan.** The orchestrator writes a spec: goals, data model, API and UI contracts, numbered acceptance criteria, and a table of work packages, each owning its own files.
 2. **Freeze shared ground.** Shared types, stub modules with final signatures, test tooling and schema are set up first, so every package compiles on its own and no two workers touch the same file.
 3. **Brief.** One task file per worker: what to read, what it owns, what to build, which acceptance criteria to prove with tests, and what "done" means.
-4. **Fan out.** Each worker runs in its own git worktree, branched from a snapshot of your working tree. On macOS each gets a visible Terminal window, plus a live progress view of the files being written. Elsewhere it's tmux or headless.
+4. **Fan out.** Each worker runs headless in its own git worktree, branched from a snapshot of your working tree. On macOS one Terminal window shows live progress for all of them: files being written and the latest lines of each. Elsewhere it's tmux or headless.
 5. **Wait without polling.** One background job blocks until every worker exits, then wakes the orchestrator once. Waiting costs zero tokens.
 6. **Verify.** Per worker: did it stay in its files, does it type-check, lint and pass tests. Then the orchestrator merges everything and runs the full build plus a real end-to-end test against actual services.
 7. **Fix and report.** Small problems are fixed directly, with regression tests. Big ones go back to a worker with a follow-up task.
@@ -71,11 +71,21 @@ Small models are good at writing code against a clear brief. They are bad at kno
 
 None of these were visible to the workers' own test suites. That's the case for hstack: cheap models for volume, a strong model as the gate.
 
-## Cost
+## Cost: measured, honestly
 
-hstack pays off on **large, well-specified, parallel** work: features of roughly 500+ lines, test suites, and mechanical refactors across many files. For those, the orchestrator writes instructions and reads diffs instead of generating code.
+**[Benchmark 1](benchmarks/2026-11-18-utility-modules.md)** (four small, precisely specified utility modules, about 1,000 lines with tests):
 
-These are estimates, not measurements. For a big task that succeeds on the first pass, the orchestrator itself should use roughly **70–80% fewer tokens** than building it alone. With one fix round that drops to around 40–55%. On small or tightly coupled changes, delegation costs more than doing it directly, and the skills tell the orchestrator to say so.
+| | Claude Opus alone | hstack (Opus + 4 Muse workers) |
+|---|---:|---:|
+| Cost | **$0.72** | $1.21 (Opus $1.17 + Muse $0.04) |
+| Hidden acceptance tests | 33/33 | 33/33 |
+| Wall time | 3 min | 9 min |
+
+hstack **lost** this one. The Muse workers wrote all the code for **4 cents**, but the orchestrator spent more tokens re-writing an already precise spec into worker briefs than it would have spent writing the code itself. That led to two rule changes:
+- a size gate: delegate only when the code is at least 5× the briefs
+- thin briefs that point to the spec instead of restating it
+
+hstack is built for large, well-specified, parallel work: big features, test suites, multi-file refactors. There, the code dwarfs the briefs. For small jobs the skills tell the orchestrator to just do the work. Benchmark 2, on a larger task with the updated skills, is next, and every benchmark goes in [`benchmarks/`](benchmarks/) with its harness, whatever the result.
 
 ## Supported pairs
 
@@ -146,7 +156,7 @@ All of them take an orchestration directory, for example `../myrepo-orch`.
 |---|---|---|
 | `AGENT_CMD` | `muse exec --prompt-file {prompt}` | Worker command; `{prompt}` becomes the task file path |
 | `TASKS_DIR` | `specs/tasks` | Where task files live inside the repo |
-| `MODE` | auto | `terminal`, `tmux` or `headless` |
+| `MODE` | `progress` on macOS | `progress` (headless workers, one progress window), `windows`, `tmux` or `headless` |
 | `DELAY` | `0` | Seconds to wait before launching (handy for screen recording) |
 | `TIMEOUT_MIN` | `120` | Give up waiting after this long |
 | `LINK_DIRS` | `node_modules` | Ignored directories to symlink into each worktree |
@@ -155,7 +165,7 @@ All of them take an orchestration directory, for example `../myrepo-orch`.
 
 ### Templates
 
-`templates/spec.md`, `templates/_common.md` (rules every worker follows) and `templates/task.md` (one per worker). Add a `<name>.owns` file with one glob per line to have `collect.sh` flag edits outside a worker's files.
+`templates/spec.md`, `templates/_common.md` (rules every worker follows), `templates/task.md` (one per worker, with input-to-output examples and a state table) and `templates/brief-checklist.md`, the specificity checklist every brief must pass, because small models guess at whatever a brief leaves out. Add a `<name>.owns` file with one glob per line to have `collect.sh` flag edits outside a worker's files.
 
 ## Safety
 

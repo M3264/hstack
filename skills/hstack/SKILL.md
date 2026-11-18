@@ -22,10 +22,11 @@ ls "$HSTACK/scripts" "$HSTACK/templates"
    - The task is big: roughly 500+ lines of new code, or 10+ files.
    - It splits into 2-6 packages with **disjoint files**.
    - Each package has a mechanical check (types, lint, tests).
+   - **Size gate:** the code to be written is at least about 5× the size of the briefs needed to describe it. Benchmark 1 (`benchmarks/2026-11-18-utility-modules.md`) shows why. Four well-specified utility modules (about 17k output tokens to build directly) cost 1.7× more through hstack, because the briefs cost more than the code. The workers' coding cost only 4 cents.
 
    Otherwise do it yourself, and tell the user honestly that delegating would cost more.
 2. **Plan and brief:** follow the `hstack-plan` skill. You write the spec, freeze the shared contracts and stubs, and write one task file per worker.
-3. **Launch and wait:** follow the `hstack-run` skill. It sets up the worktrees, opens one visible worker per package plus a live progress view, and blocks in the background until every worker exits.
+3. **Launch and wait:** follow the `hstack-run` skill. It sets up the worktrees, runs one headless worker per package with a single live progress window, and blocks in the background until every worker exits.
 4. **Verify, merge and report:** follow the `hstack-verify` skill. That covers lanes, types, lint, tests, merge, production build, a real end-to-end run, security review and the final report.
 
 If a sub-skill isn't installed, its instructions are in `$HSTACK/skills/<name>/SKILL.md`.
@@ -35,7 +36,7 @@ If a sub-skill isn't installed, its instructions are in `$HSTACK/skills/<name>/S
 - Workers never commit or push, and never touch your branch. Only you apply their patches, and only after verifying them.
 - Never poll workers from your own turns. Wait on one background command that wakes you on exit.
 - Don't commit, push or delete worktrees unless the user asks.
-- Cost guidance for the user (estimates, not measurements):
+- Cost guidance for the user. Only benchmark 1 is measured; everything else here is an estimate:
   - A big task that succeeds on the first pass saves the orchestrator roughly 70-80% of its own tokens.
   - With one fix round, about 40-55%.
   - On small or tangled tasks it saves nothing.
