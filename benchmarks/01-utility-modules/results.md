@@ -1,12 +1,12 @@
 # Benchmark 1: four utility modules (2026-11-18)
 
-**Result: hstack cost 1.7× more than Claude alone on this task.** Both produced fully correct code. The task was too small and too precisely specified for delegation to pay off, and the orchestrator spent most of its budget re-writing an already precise spec into long worker briefs. Findings and fixes are below. Raw numbers are in [`2026-11-18-utility-modules.raw.json`](2026-11-18-utility-modules.raw.json) and the harness is in [`harness/`](harness/).
+**Result: hstack cost 1.7× more than Claude alone on this task.** Both produced fully correct code. The task was too small and too precisely specified for delegation to pay off, and the orchestrator spent most of its budget re-writing an already precise spec into long worker briefs. Findings and fixes are below. Raw numbers are in [`results.raw.json`](results.raw.json). The task, hidden suite and runner are in this repo (see [`../README.md`](../README.md)).
 
 ## Task
 
-[`BENCH-SPEC.md`](harness/BENCH-SPEC.md): four independent TypeScript modules with their own tests: `slugify`, a semver parser with comparison and ranges, an RFC 4180 CSV parser and stringifier, and a token bucket plus sliding-window rate limiter. Roughly 850-1,300 lines including tests. The spec is about 900 words and gives exact signatures and input-to-output examples.
+[`BENCH-SPEC.md`](base/BENCH-SPEC.md): four independent TypeScript modules with their own tests: `slugify`, a semver parser with comparison and ranges, an RFC 4180 CSV parser and stringifier, and a token bucket plus sliding-window rate limiter. Roughly 850-1,300 lines including tests. The spec is about 900 words and gives exact signatures and input-to-output examples.
 
-Quality gate: a hidden acceptance suite ([`acceptance.test.ts`](harness/acceptance.test.ts), 33 tests) that neither run saw, plus `tsc --noEmit`.
+Quality gate: a hidden acceptance suite ([`hidden/acceptance.test.ts`](hidden/acceptance.test.ts), 33 tests) that neither run saw, plus `tsc --noEmit`.
 
 ## Setup
 
@@ -62,8 +62,9 @@ If the plan phase had written thin briefs (about 2k output tokens and fewer turn
 ## Reproduce
 
 ```bash
-# edit paths at the top of harness/bench.sh, then
-./bench.sh solo
-./bench.sh hstack
-python3 cost.py results
+benchmarks/run.sh benchmarks/01-utility-modules solo
+benchmarks/run.sh benchmarks/01-utility-modules hstack
+python3 benchmarks/cost.py benchmarks/.work/01-utility-modules/results
 ```
+
+Note: this run predates the thin-brief rule. Its planner prompt asked workers to follow the full templates, and today's `run.sh` asks for thin briefs, so a rerun measures the updated skills.

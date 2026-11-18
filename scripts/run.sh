@@ -11,6 +11,7 @@
 #                     | tmux | headless (default: auto)
 #        DELAY        seconds to wait before launching (default: 0)
 #        TIMEOUT_MIN  give up waiting after this many minutes (default: 120)
+#        WORKER_RETRIES  re-run a worker that exits non-zero this many times (default: 1)
 set -uo pipefail
 
 ORCH=$(cd "${1:?usage: run.sh <orch-dir>}" && pwd)
@@ -33,7 +34,7 @@ if [ "$MODE" = auto ]; then
 fi
 
 mkdir -p "$ORCH/.status" "$ORCH/logs" "$ORCH/.run"
-for n in "${names[@]}"; do rm -f "$ORCH/.status/$n.exit"; done
+for n in "${names[@]}"; do rm -f "$ORCH/.status/$n.exit"; : > "$ORCH/logs/$n.log"; done
 
 # One runner script per worker so exit codes are captured the same way in every mode.
 for n in "${names[@]}"; do
@@ -42,8 +43,18 @@ for n in "${names[@]}"; do
   cat > "$ORCH/.run/$n.sh" <<EOF
 #!/usr/bin/env bash
 cd "$ORCH/$n" || exit 1
-${AGENT_CMD//\{prompt\}/$prompt} 2>&1 | tee "$ORCH/logs/$n.log"
-echo "\${PIPESTATUS[0]}" > "$ORCH/.status/$n.exit"
+# Retry a crashed worker (e.g. provider stream errors) before reporting failure.
+attempt=0
+while :; do
+  ${AGENT_CMD//\{prompt\}/$prompt} 2>&1 | tee -a "$ORCH/logs/$n.log"
+  code=\${PIPESTATUS[0]}
+  [ "\$code" -eq 0 ] && break
+  attempt=\$((attempt + 1))
+  [ "\$attempt" -gt ${WORKER_RETRIES:-1} ] && break
+  echo "hstack: worker exited \$code, retry \$attempt of ${WORKER_RETRIES:-1}" | tee -a "$ORCH/logs/$n.log"
+  sleep 10
+done
+echo "\$code" > "$ORCH/.status/$n.exit"
 EOF
   chmod +x "$ORCH/.run/$n.sh"
 done

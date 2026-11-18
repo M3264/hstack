@@ -49,6 +49,6 @@ In `windows` mode, closing a worker's window kills that worker, so ask the user 
 - Headless worker CLIs often print nothing until they finish. The progress view shows files being written instead.
 - New terminals may print errors from the user's shell startup files. That noise is harmless, so tell the user so they don't worry.
 - Muse marks fresh worktrees as untrusted, which disables `AGENTS.md` loading and its own sub-agents. Have the task files tell workers to read `AGENTS.md` explicitly. Pass `--trust-workspace` only if the user agrees.
-- Transient network resets happen. Muse retries on its own.
+- Transient network resets happen. Muse retries within a run, and `run.sh` re-runs a worker that still exits non-zero (`WORKER_RETRIES`, default 1). In benchmark 2 one worker failed after 13 minutes of stream errors, and the orchestrator had to write its module, which cost far more than a retry.
 - `muse attach` (live attach) is off by default, so don't promise it.
 - Your own harness may block broad `rm` globs. Remove files by explicit path.

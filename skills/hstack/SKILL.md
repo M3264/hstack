@@ -22,7 +22,7 @@ ls "$HSTACK/scripts" "$HSTACK/templates"
    - The task is big: roughly 500+ lines of new code, or 10+ files.
    - It splits into 2-6 packages with **disjoint files**.
    - Each package has a mechanical check (types, lint, tests).
-   - **Size gate:** the code to be written is at least about 5× the size of the briefs needed to describe it. Benchmark 1 (`benchmarks/2026-11-18-utility-modules.md`) shows why. Four well-specified utility modules (about 17k output tokens to build directly) cost 1.7× more through hstack, because the briefs cost more than the code. The workers' coding cost only 4 cents.
+   - **Size gate:** the code to be written is at least about 5× the size of the briefs needed to describe it. Benchmark 1 (`benchmarks/01-utility-modules/results.md`) shows why. Four well-specified utility modules (about 17k output tokens to build directly) cost 1.7× more through hstack, because the briefs cost more than the code. The workers' coding cost only 4 cents.
 
    Otherwise do it yourself, and tell the user honestly that delegating would cost more.
 2. **Plan and brief:** follow the `hstack-plan` skill. You write the spec, freeze the shared contracts and stubs, and write one task file per worker.

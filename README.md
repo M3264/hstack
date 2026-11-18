@@ -73,19 +73,17 @@ None of these were visible to the workers' own test suites. That's the case for 
 
 ## Cost: measured, honestly
 
-**[Benchmark 1](benchmarks/2026-11-18-utility-modules.md)** (four small, precisely specified utility modules, about 1,000 lines with tests):
+Every benchmark is in [`benchmarks/`](benchmarks/) with its task, hidden test suite and runner, whatever the result. Costs use Claude Opus 5.5 standard API prices and Muse Spark 1.3 Contributor prices, from exact token counts.
 
-| | Claude Opus alone | hstack (Opus + 4 Muse workers) |
-|---|---:|---:|
-| Cost | **$0.72** | $1.21 (Opus $1.17 + Muse $0.04) |
-| Hidden acceptance tests | 33/33 | 33/33 |
-| Wall time | 3 min | 9 min |
+| Benchmark | Claude Opus alone | hstack (Opus + Muse workers) | Hidden tests |
+|---|---:|---:|---|
+| [1: four small utility modules](benchmarks/01-utility-modules/results.md) | **$0.72** | $1.21 (+68%) | 33/33 · 33/33 |
+| [2: six engine modules](benchmarks/02-engine-modules/results.md) | $1.09 | **$0.98** (-10%) | 82/82 · 82/82 |
 
-hstack **lost** this one. The Muse workers wrote all the code for **4 cents**, but the orchestrator spent more tokens re-writing an already precise spec into worker briefs than it would have spent writing the code itself. That led to two rule changes:
-- a size gate: delegate only when the code is at least 5× the briefs
-- thin briefs that point to the spec instead of restating it
-
-hstack is built for large, well-specified, parallel work: big features, test suites, multi-file refactors. There, the code dwarfs the briefs. For small jobs the skills tell the orchestrator to just do the work. Benchmark 2, on a larger task with the updated skills, is next, and every benchmark goes in [`benchmarks/`](benchmarks/) with its harness, whatever the result.
+- **Benchmark 1 lost.** The orchestrator re-wrote an already precise spec into long briefs and spent more on them than on the code. That led to the thin-brief rule and a size gate.
+- **Benchmark 2 won with those rules,** at identical quality, even though one worker crashed on provider network errors and the orchestrator wrote that module itself. Without the crash the estimate is about 28% cheaper. Workers now retry automatically.
+- **Across both, all small-model coding cost 12 cents.** The orchestrator's planning and verification output is where the money goes. The roadmap is about shrinking it further.
+- **hstack is slower in wall-clock time** (4-9 minutes versus 3-4 in these runs) because of planning, worker startup and verification.
 
 ## Supported pairs
 
@@ -98,6 +96,7 @@ Roadmap:
 
 - First-class worker and orchestrator support for **Muse Code, Claude Code, Cursor and OpenCode**, in any combination.
 - **In-harness orchestration.** In harnesses that can run several models themselves, the large model will spawn and direct the smaller ones directly, with no external CLI.
+- **Worker skills:** prebuilt skills that small models load cheaply (worker rules, stack conventions, UI-state and accessibility patterns), so the orchestrator stops paying output tokens to repeat them in every brief.
 - Measured per-run cost reports, comparing the orchestrator's and workers' token use with a single-model baseline.
 
 ## The skills
@@ -106,7 +105,7 @@ Roadmap:
 |---|---|
 | [`hstack`](skills/hstack/SKILL.md) | Entry point. Decides whether delegation is worth it and runs the whole flow through the skills below. |
 | [`hstack-plan`](skills/hstack-plan/SKILL.md) | Spec, frozen contracts and stubs, and one precise task file per worker. |
-| [`hstack-run`](skills/hstack-run/SKILL.md) | Isolated worktrees, one visible worker per package, live progress, a background wait with no polling, clean restarts. |
+| [`hstack-run`](skills/hstack-run/SKILL.md) | Isolated worktrees, headless workers with automatic retries, one live progress window, a background wait with no polling, clean restarts. |
 | [`hstack-verify`](skills/hstack-verify/SKILL.md) | Lane checks, per-worker checks, merge, production build, real end-to-end test, security review, report. |
 
 Each skill works on its own (for example, `hstack-verify` can review any delegated code), and together they form the full loop. Shared `scripts/` and `templates/` live at the repo root.
