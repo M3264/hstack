@@ -26,7 +26,7 @@ for n in "${names[@]}"; do
     cd "$wt" || exit 1
     export GIT_INDEX_FILE="$IDX"
     git read-tree "$SNAP"
-    git add -A -- . ":(exclude).orch" ":(exclude)$TASKS_DIR"
+    git add -A -- . ":(exclude).orch" ":(exclude).hstack" ":(exclude)$TASKS_DIR"
     git diff --cached --binary "$SNAP" > "$ORCH/patches/$n.patch"
     git diff --cached --stat "$SNAP" | tail -1
     git diff --cached --name-only "$SNAP" > "$ORCH/patches/$n.files"

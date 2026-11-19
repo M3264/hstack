@@ -1,54 +1,50 @@
 # hstack benchmarks
 
-Each benchmark runs the same task two ways and measures exact token usage and cost:
+Each benchmark runs the same task two ways and measures exact tokens and cost:
 
-- **solo:** the large model (Claude Opus via `claude -p`) does everything.
-- **hstack:** the large model plans with `hstack-plan`, small workers (Muse via `muse exec --json`) build in parallel, and the large model verifies and merges with `hstack-verify`.
+- **solo:** the frontier model (Muse Wonder via `muse exec`) does everything.
+- **hstack:**
+  1. The frontier writes a short intake.
+  2. A small-model lead (Muse Spark, `muse exec --json --trust-workspace`) writes the spec, plan, tests and code, with its own sub-agents.
+  3. The frontier answers each checkpoint in one call per event, and approves the result.
 
-Quality gate: a hidden acceptance suite that neither run sees, plus `tsc --noEmit`. Every result is published here, wins and losses alike.
+The quality gate is a hidden acceptance suite that neither side sees, plus `tsc --noEmit`. Every result is published, wins and losses alike.
 
-| # | Task | Solo | hstack | Hidden tests (solo / hstack) |
+| # | Task | Frontier alone | hstack | Hidden tests |
 |---|---|---:|---:|---|
-| [01](01-utility-modules/results.md) | 4 small utility modules | **$0.72** | $1.21 | 33/33 · 33/33 |
-| [02](02-engine-modules/results.md) | 6 engine modules (Markdown, cron, JSONPath, diff, templates, expressions) | $1.09 | **$0.98** (-10%) | 82/82 · 82/82 |
+| [01](01-engine-modules/results.md) | Six engine modules: Markdown, cron, JSONPath, diff, templates, expressions | $2.46 | **$1.59 (-35%)** | 82/82 · 82/82 |
+
+## Run benchmark 1
+
+Requirements: `muse` on your `PATH`, `node`/`npm`, `python3`. It spends real usage on your Muse account. Choose the models with `FRONTIER_MODEL` (default `muse-wonder-1.0`) and `SMALL_MODEL` (default `muse-spark-1.3-contributor`). A failed call stops the run instead of recording bad numbers.
+
+```bash
+cd ~/hstack
+benchmarks/run.sh benchmarks/01-engine-modules solo
+benchmarks/run.sh benchmarks/01-engine-modules hstack      # can run in parallel with solo
+python3 benchmarks/cost.py benchmarks/.work/01-engine-modules/results
+```
+
+For the hstack run, a progress window opens showing the lead's checkpoints and files. The run also saves:
+- the full checkpoint conversation (events and directives), in `results/hstack-checkpoints/`
+- the frontier's cost per call, in `cost.py`'s output
+
+## Pricing used (`cost.py`)
+
+Per 1M tokens (cached / input / output):
+- **Muse Wonder 1.0:** $0.20 / $4 / $20
+- **Muse Spark 1.3 Contributor:** $0.002 / $0.10 / $0.20
+- **Muse Spark 1.3:** $0.15 / $1.25 / $4.25
+
+Reasoning tokens are billed as output, which is conservative. Usage includes every sub-agent: `muse exec --json` reports only the top-level run, so `cost.py` reads Muse's session store.
 
 ## Layout
 
 ```
 benchmarks/
-  run.sh                 runner: run.sh <benchmark-dir> solo|hstack
-  cost.py                token and cost calculator
-  NN-name/
-    base/                starting project, including BENCH-SPEC.md (the task)
-    hidden/              acceptance suite, copied in only after a run finishes
-    workers.txt          work-package names for the hstack run
-    results.md           write-up (results.raw.json holds the calculator output)
-  .work/                 git-ignored run folders and raw outputs
+  run.sh, cost.py
+  01-engine-modules/
+    base/      starting project + BENCH-SPEC.md (the task)
+    hidden/    acceptance suite, copied in only after a run
+  .work/       git-ignored runs and raw results
 ```
-
-## Run one
-
-Requirements: `claude` and `muse` on your `PATH`, `node`/`npm`, `python3`. Each run spends real money on your Claude account. The caps are `SOLO_BUDGET` (default $40) and `PHASE_BUDGET` (default $10 per hstack phase).
-
-```bash
-benchmarks/run.sh benchmarks/02-engine-modules solo
-benchmarks/run.sh benchmarks/02-engine-modules hstack     # can run in parallel with solo
-python3 benchmarks/cost.py benchmarks/.work/02-engine-modules/results
-```
-
-## Pricing used
-
-Per 1M tokens, in `cost.py`:
-- **Claude Opus 5.5 (standard API):** $4 input, $20 output (thinking included), $5 for 5-minute cache writes, $8 for 1-hour cache writes, $0.20 for cache reads.
-- **Muse Spark 1.3 Contributor:** $0.10 input, $0.002 cached input, $0.20 output.
-
-Muse reasoning tokens are billed as output (conservative). The Opus figures match the Claude CLI's own reported cost.
-
-## Add a benchmark
-
-Create `NN-name/` with:
-- `base/`, a minimal project with `BENCH-SPEC.md`: exact signatures and input-to-output examples
-- `hidden/acceptance.test.ts`
-- `workers.txt`
-
-Pick tasks where the expected code is much larger than the spec. The interesting question is where hstack's break-even point sits.

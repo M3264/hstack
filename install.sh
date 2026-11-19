@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # Install every hstack skill into an agent harness by symlinking skills/* into its skills folder.
-# Usage: ./install.sh claude|codex|muse|<skills-dir>
+# Usage: ./install.sh claude|muse|<skills-dir>
+#   claude  ~/.claude/skills, read by Claude Code (frontier) and also by Muse Code
+#   muse    ~/.config/muse/skills (Muse only)
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 case "${1:-}" in
   claude) DEST="$HOME/.claude/skills" ;;
-  codex)  DEST="$HOME/.codex/skills" ;;
   muse)   DEST="$HOME/.config/muse/skills" ;;
-  "")     echo "usage: ./install.sh claude|codex|muse|<skills-dir>" >&2; exit 2 ;;
+  "")     echo "usage: ./install.sh claude|muse|<skills-dir>" >&2; exit 2 ;;
   *)      DEST="$1" ;;
 esac
 

@@ -1,67 +1,93 @@
 #!/usr/bin/env python3
-"""Turn benchmark outputs into token and cost numbers. Usage: cost.py <results-dir>"""
+"""Token and cost numbers for one benchmark. Usage: cost.py <results-dir>"""
 import glob, json, os, re, sys
 
-R = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), "results")
+R = sys.argv[1] if len(sys.argv) > 1 else "results"
 
-# Prices per 1M tokens, Claude Opus 5.5 standard API pricing (provided by the user, 2026-11-18).
-# Thinking tokens are included in output.
-OPUS = {"input": 4.00, "output": 20.00, "cache_write_5m": 5.00, "cache_write_1h": 8.00, "cache_read": 0.20}
-MUSE = {"input": 0.10, "cached": 0.002, "output": 0.20}
+# USD per 1M tokens: (cached input, input, output). Reasoning tokens are billed as output.
+PRICES = {
+    "muse-wonder-1.0": (0.20, 4.00, 20.00),
+    "muse-spark-1.3": (0.15, 1.25, 4.25),
+    "muse-spark-1.3-contributor": (0.002, 0.10, 0.20),
+    "muse-spark-1.2": (0.15, 1.25, 4.25),
+    "muse-spark-1.2-contributor": (0.002, 0.10, 0.20),
+}
 
 
-def claude_usage(path):
-    """Opus tokens from a `claude -p --output-format json` result, priced with the rates above.
-    Claude Code's own helper calls to smaller models are added at their CLI-reported cost."""
-    if not os.path.exists(path) or os.path.getsize(path) == 0:
+SESSIONS = os.path.expanduser("~/.local/share/muse/sessions")
+
+
+def _log_meta(log):
+    """(session id, model) from a `muse exec --json` log."""
+    sid = model = None
+    for line in open(log, errors="ignore"):
+        if sid is None:
+            m = re.search(r'"stream":\{"kind":"session","id":"([0-9a-f-]{36})"', line)
+            if m:
+                sid = m.group(1)
+        if model is None and '"run_usage"' in line:
+            m = re.search(r'"model":"([a-z0-9.-]+)"', line)
+            if m:
+                model = m.group(1)
+        if sid and model:
+            break
+    return sid, model
+
+
+def _session_records(sid):
+    """Per-call usage records for a session and all its sub-agents (workflow children).
+    Muse's run_usage in the --json log does not include sub-agents, so these are the source of truth."""
+    dirs = glob.glob(os.path.join(SESSIONS, "*", "*", "*", sid))
+    if not dirs:
         return None
-    d = json.load(open(path))
-    t = {"input": 0, "cache_write_5m": 0, "cache_write_1h": 0, "cache_read": 0, "output": 0,
-         "helper_models_cost": 0.0}
-    # Use the per-run `usage` block: `modelUsage` is cumulative across a resumed session.
-    u = d.get("usage", {})
-    cc = u.get("cache_creation") or {}
-    t["input"] = u.get("input_tokens", 0)
-    t["cache_write_5m"] = cc.get("ephemeral_5m_input_tokens", 0)
-    t["cache_write_1h"] = cc.get("ephemeral_1h_input_tokens", u.get("cache_creation_input_tokens", 0) if not cc else 0)
-    t["cache_read"] = u.get("cache_read_input_tokens", 0)
-    t["output"] = u.get("output_tokens", 0)
-    for model, mu in (d.get("modelUsage") or {}).items():
-        if "opus" not in model:
-            t["helper_models_cost"] += mu.get("costUSD", 0.0)
-    t["cost"] = round(sum(t[k] * OPUS[k] for k in ("input", "cache_write_5m", "cache_write_1h", "cache_read", "output")) / 1e6
-                      + t["helper_models_cost"], 4)
-    t["cli_reported_cost_cumulative"] = d.get("total_cost_usd")
-    t["turns"] = d.get("num_turns")
-    t["duration_s"] = round((d.get("duration_ms") or 0) / 1000)
-    return t
-
-
-def muse_usage(results_dir):
-    """Sum the final run_usage event of every Muse run found in worker logs."""
-    t = {"input": 0, "cached": 0, "output": 0, "reasoning": 0, "runs": 0}
-    for log in glob.glob(os.path.join(results_dir, "wp-*.log")):
-        last = {}
-        for line in open(log, errors="ignore"):
-            if '"run_usage"' not in line:
+    files = [os.path.join(dirs[0], "session.jsonl")] + glob.glob(os.path.join(dirs[0], "subagent", "*", "session.jsonl"))
+    t = {"input": 0, "cached": 0, "output": 0, "reasoning": 0, "calls": 0, "subagents": len(files) - 1}
+    for f in files:
+        seen = set()
+        for line in open(f, errors="ignore"):
+            if "goal_usage_attribution" not in line:
                 continue
             try:
-                p = json.loads(line)["payload"]
+                rec = json.loads(line)["payload"]["event"]["record"]
             except Exception:
                 continue
-            last[p["run_stream"]["id"]] = p
-        for p in last.values():
-            t["runs"] += 1
-            for m in p["models"]:
-                t["input"] += m.get("input_tokens", 0)
-                t["cached"] += m.get("cached_tokens", 0)
-                t["output"] += m.get("output_tokens", 0)
-                t["reasoning"] += m.get("reasoning_tokens", 0)
-    uncached = max(t["input"] - t["cached"], 0)
-    # Conservative: bill reasoning tokens as output on top of output tokens.
-    t["cost"] = (uncached * MUSE["input"] + t["cached"] * MUSE["cached"]
-                 + (t["output"] + t["reasoning"]) * MUSE["output"]) / 1e6
+            q = rec.get("quantity", {})
+            if rec.get("usage_id") in seen or q.get("unit") != "tokens":
+                continue
+            seen.add(rec.get("usage_id"))
+            t["calls"] += 1
+            for k, src in (("input", "input_tokens"), ("cached", "cached_tokens"),
+                           ("output", "output_tokens"), ("reasoning", "reasoning_tokens")):
+                t[k] += q.get(src, 0)
     return t
+
+
+def muse_usage(paths):
+    """Usage per model across Muse --json logs, including sub-agents (from the session store).
+    Each log's session is billed at that log's model. Reasoning tokens are billed as output."""
+    models, cost = {}, 0.0
+    for log in paths:
+        sid, model = _log_meta(log)
+        model = model or "unknown"
+        rec = _session_records(sid) if sid else None
+        if rec is None:  # fall back to the log's own run_usage (misses sub-agents)
+            rec = {"input": 0, "cached": 0, "output": 0, "reasoning": 0, "calls": 0, "subagents": 0, "note": "log only"}
+            for line in open(log, errors="ignore"):
+                if '"run_usage"' in line:
+                    for m in json.loads(line)["payload"]["models"]:
+                        for k, src in (("input", "input_tokens"), ("cached", "cached_tokens"),
+                                       ("output", "output_tokens"), ("reasoning", "reasoning_tokens")):
+                            rec[k] += m.get(src, 0)
+                        rec["calls"] += m.get("calls", 0)
+        t = models.setdefault(model, {"input": 0, "cached": 0, "output": 0, "reasoning": 0, "calls": 0, "subagents": 0})
+        for k in ("input", "cached", "output", "reasoning", "calls", "subagents"):
+            t[k] += rec[k]
+    for name, t in models.items():
+        c_in, p_in, p_out = PRICES.get(name, PRICES["muse-wonder-1.0"])
+        t["cost"] = round((t["cached"] * c_in + max(t["input"] - t["cached"], 0) * p_in
+                           + (t["output"] + t["reasoning"]) * p_out) / 1e6, 4)
+        cost += t["cost"]
+    return {"models": models, "cost": round(cost, 4)}
 
 
 def acceptance(path):
@@ -82,13 +108,21 @@ def wall(name):
         return None
 
 
-solo = claude_usage(f"{R}/solo.json")
-plan = claude_usage(f"{R}/hstack.plan.json")
-verify = claude_usage(f"{R}/hstack.verify.json")
-muse = muse_usage(R)
-print(json.dumps({
-    "solo": solo, "hstack_plan": plan, "hstack_verify": verify, "muse": muse,
-    "solo_acceptance": acceptance(f"{R}/solo.acceptance.txt"),
-    "hstack_acceptance": acceptance(f"{R}/hstack.acceptance.txt"),
-    "solo_wall_s": wall("solo"), "hstack_wall_s": wall("hstack"),
-}, indent=1))
+out = {}
+if os.path.exists(f"{R}/solo.frontier.log"):
+    out["solo"] = muse_usage([f"{R}/solo.frontier.log"])
+    out["solo_acceptance"] = acceptance(f"{R}/solo.acceptance.txt")
+    out["solo_wall_s"] = wall("solo")
+frontier = sorted(glob.glob(f"{R}/frontier-*.log"))
+if frontier:
+    f = muse_usage(frontier)
+    f["per_call"] = [{"call": os.path.basename(p), "cost": muse_usage([p])["cost"]} for p in frontier]
+    lead = muse_usage(glob.glob(f"{R}/*.lead.log"))
+    out["hstack"] = {"frontier": f, "small": lead, "total_cost": round(f["cost"] + lead["cost"], 4)}
+    out["hstack_acceptance"] = acceptance(f"{R}/hstack.acceptance.txt")
+    out["hstack_wall_s"] = wall("hstack")
+    if os.path.exists(f"{R}/events.txt"):
+        out["hstack_events"] = open(f"{R}/events.txt").read().split("\n")[:-1]
+if "solo" in out and "hstack" in out and out["solo"]["cost"]:
+    out["hstack_vs_solo"] = f"{(out['hstack']['total_cost'] / out['solo']['cost'] - 1) * 100:+.0f}%"
+print(json.dumps(out, indent=1))

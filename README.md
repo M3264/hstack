@@ -1,178 +1,107 @@
 # hstack
 
-**Big models plan. Small models build. Big models verify.**
+**Small models do the work. Frontier models direct it.**
 
-hstack is a collection of agent skills that turns a frontier model into an engineering lead. Instead of writing every line itself, the large model writes the spec, splits the work, and directs a team of smaller, cheaper coding agents running in parallel. Then it checks their work against real tests and real services before anything is merged.
+hstack is a collection of agent skills that turns a frontier model into a senior engineer and a small, cheap model into the team that does the work.
 
-You get frontier-level judgment on the parts that need it (architecture, contracts, review, security) and small-model prices on the part that costs the most tokens: writing the code.
+The small model writes the spec, the plan and the tests, writes the code, and runs its own reviewer. The frontier model writes a short intake, approves the plan, answers a few checkpoints with terse directives, and signs off on the result. Most of the time it's just waiting, which costs nothing.
+
+The goal: most of the tokens go to the cheap model, while code quality stays at the level a frontier model would hold it to.
+
+> Status: early. hstack currently runs on **Muse Code**: Muse Wonder as the frontier and Muse Spark as the small model. Other harnesses come later.
 
 ---
 
 ## Why
 
-Today you usually pick one model per task, or route each request to a model based on how hard it looks. Routing helps with cost, but every request is still handled by one model on its own. Nothing plans the whole job, and nothing checks the cheap model's work.
+Frontier tokens cost about 100× more than small-model tokens. Earlier experiments with hstack showed where they go:
+- **The frontier writing text is the expensive part:** specs, briefs and fixes.
+- **Small-model coding is almost free:** in one run, six small-model workers wrote six modules for 8 cents.
+- **Every step moved from the frontier to the small model cut cost without hurting quality.**
 
-hstack takes a different approach. The big model doesn't hand the task off; it **orchestrates** it:
-
-| | One big model | Model routing | hstack |
-|---|---|---|---|
-| Who writes the code | Big model | Whichever model the router picks | Several small models in parallel |
-| Who plans and splits the work | Big model, inline | Nobody | Big model, up front, as a written spec |
-| Who checks the result | Big model, inline | Nobody | Big model, against tests and real services |
-| Cost of the bulk work | Highest | Varies | Small-model prices |
-| Parallelism | No | No | Yes, one agent per work package |
-
-The expensive part of agentic coding is output tokens: generating code, re-reading files, iterating. hstack moves that to small models and keeps the big model on the high-leverage work: deciding what to build, defining exact contracts, and catching what the small models get wrong.
+So hstack takes that to its end. The small model does everything it can, and the frontier only decides **why** and **what**, checks the **how**, and corrects course in as few tokens as possible.
 
 ## How it works
 
 ```
-                    ┌──────────────────────────────┐
-                    │  Orchestrator (large model)  │
-                    │  spec · contracts · stubs    │
-                    └──────────────┬───────────────┘
-                                   │ task files
-        ┌──────────────┬───────────┴──┬──────────────┐
-        ▼              ▼              ▼              ▼
-   ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐
-   │ worker 1│    │ worker 2│    │ worker 3│    │ worker 4│   small models,
-   │ worktree│    │ worktree│    │ worktree│    │ worktree│   isolated git worktrees
-   └────┬────┘    └────┬────┘    └────┬────┘    └────┬────┘
-        └──────────────┴──────┬───────┴──────────────┘
-                              ▼ patches + reports
-                    ┌──────────────────────────────┐
-                    │  Orchestrator verifies       │
-                    │  lanes · types · tests ·     │
-                    │  build · real E2E · review   │
-                    └──────────────┬───────────────┘
-                                   ▼
-                             merged, working code
+ you ──task──▶ frontier (senior engineer)
+                 │  intake: why, acceptance criteria, constraints, risks   (~20 lines)
+                 ▼
+               Muse lead (small model)
+                 │  explores, writes spec + plan + criteria→tests map
+                 │  ──▶ checkpoint: plan ──▶ frontier: APPROVE / REVISE (≤10 lines)
+                 │  builds: alone, or fans out to 1…N Muse sub-agents
+                 │  tests first, implements, runs an independent reviewer sub-agent
+                 │  ──▶ checkpoint: done ──▶ frontier: runs checks, spot-checks risks,
+                 │                             APPROVE / REVISE
+                 ▼
+               merge into your tree ──▶ report
 ```
 
-1. **Plan.** The orchestrator writes a spec: goals, data model, API and UI contracts, numbered acceptance criteria, and a table of work packages, each owning its own files.
-2. **Freeze shared ground.** Shared types, stub modules with final signatures, test tooling and schema are set up first, so every package compiles on its own and no two workers touch the same file.
-3. **Brief.** One task file per worker: what to read, what it owns, what to build, which acceptance criteria to prove with tests, and what "done" means.
-4. **Fan out.** Each worker runs headless in its own git worktree, branched from a snapshot of your working tree. On macOS one Terminal window shows live progress for all of them: files being written and the latest lines of each. Elsewhere it's tmux or headless.
-5. **Wait without polling.** One background job blocks until every worker exits, then wakes the orchestrator once. Waiting costs zero tokens.
-6. **Verify.** Per worker: did it stay in its files, does it type-check, lint and pass tests. Then the orchestrator merges everything and runs the full build plus a real end-to-end test against actual services.
-7. **Fix and report.** Small problems are fixed directly, with regression tests. Big ones go back to a worker with a follow-up task.
+- **Event-driven:** while the lead works, a script blocks and wakes the frontier only when a checkpoint arrives. There's no polling, and waiting costs no tokens.
+- **Worker count follows the task:** the lead decides whether to do it alone or fan out to 2 or 100 sub-agents, and the frontier approves that choice in the plan.
+- **Isolated:** the lead works in its own git worktree. Nothing reaches your code until the frontier approves and the patch is applied.
+- **Skilled small models:** the `hstack-practice` skill gives the small model the engineering habits it usually lacks: exact specs, state tables, test-first development, real-environment facts and security basics. The frontier doesn't have to repeat them in every message.
 
-## Why verification is the point
+## Risks and how hstack handles them
 
-Small models are good at writing code against a clear brief. They are bad at knowing what they don't know. In the first real hstack run:
-
-- **4 workers** built a full social layer (passwordless email sign-in, rotating refresh tokens, likes, comments, posts, UI and integration) in **about 20 minutes**.
-- They produced **about 8,600 lines** and **300 passing tests**, and every worker reported "done".
-- The orchestrator's end-to-end run against the real database still found **5 real bugs**:
-  - Every sign-in failed, because the database driver returns dates in a format the workers' mocks didn't match.
-  - Valid requests were rejected by an over-strict security check.
-  - A login endpoint was being frozen at build time.
-  - Two refresh-token security flaws.
-
-None of these were visible to the workers' own test suites. That's the case for hstack: cheap models for volume, a strong model as the gate.
-
-## Cost: measured, honestly
-
-Every benchmark is in [`benchmarks/`](benchmarks/) with its task, hidden test suite and runner, whatever the result. Costs use Claude Opus 5.5 standard API prices and Muse Spark 1.3 Contributor prices, from exact token counts.
-
-| Benchmark | Claude Opus alone | hstack (Opus + Muse workers) | Hidden tests |
-|---|---:|---:|---|
-| [1: four small utility modules](benchmarks/01-utility-modules/results.md) | **$0.72** | $1.21 (+68%) | 33/33 · 33/33 |
-| [2: six engine modules](benchmarks/02-engine-modules/results.md) | $1.09 | **$0.98** (-10%) | 82/82 · 82/82 |
-
-- **Benchmark 1 lost.** The orchestrator re-wrote an already precise spec into long briefs and spent more on them than on the code. That led to the thin-brief rule and a size gate.
-- **Benchmark 2 won with those rules,** at identical quality, even though one worker crashed on provider network errors and the orchestrator wrote that module itself. Without the crash the estimate is about 28% cheaper. Workers now retry automatically.
-- **Across both, all small-model coding cost 12 cents.** The orchestrator's planning and verification output is where the money goes. The roadmap is about shrinking it further.
-- **hstack is slower in wall-clock time** (4-9 minutes versus 3-4 in these runs) because of planning, worker startup and verification.
-
-## Supported pairs
-
-| Orchestrator (large model) | Workers (small models) | Status |
-|---|---|---|
-| Claude Code | Muse Code (`muse exec`) | Working (the run described above) |
-| Any skill-aware agent | Any CLI agent via `AGENT_CMD` | Works, less tested |
-
-Roadmap:
-
-- First-class worker and orchestrator support for **Muse Code, Claude Code, Cursor and OpenCode**, in any combination.
-- **In-harness orchestration.** In harnesses that can run several models themselves, the large model will spawn and direct the smaller ones directly, with no external CLI.
-- **Worker skills:** prebuilt skills that small models load cheaply (worker rules, stack conventions, UI-state and accessibility patterns), so the orchestrator stops paying output tokens to repeat them in every brief.
-- Measured per-run cost reports, comparing the orchestrator's and workers' token use with a single-model baseline.
+| Risk | Mitigation |
+|---|---|
+| Muse's spec drifts from what the user meant | The frontier's intake states acceptance criteria up front, and plan review checks the spec against them |
+| Muse's tests only confirm its own mistakes | An independent Muse reviewer adds tests aimed at breaking the code, and the frontier spot-checks tests against the criteria |
+| Lots of checkpoints add up | Wake on events only, keep digests short, and frontier context stays small |
+| Tasks too vague for a small model | The frontier stays involved longer: more plan iterations, still terse |
 
 ## The skills
 
-| Skill | Role |
-|---|---|
-| [`hstack`](skills/hstack/SKILL.md) | Entry point. Decides whether delegation is worth it and runs the whole flow through the skills below. |
-| [`hstack-plan`](skills/hstack-plan/SKILL.md) | Spec, frozen contracts and stubs, and one precise task file per worker. |
-| [`hstack-run`](skills/hstack-run/SKILL.md) | Isolated worktrees, headless workers with automatic retries, one live progress window, a background wait with no polling, clean restarts. |
-| [`hstack-verify`](skills/hstack-verify/SKILL.md) | Lane checks, per-worker checks, merge, production build, real end-to-end test, security review, report. |
-
-Each skill works on its own (for example, `hstack-verify` can review any delegated code), and together they form the full loop. Shared `scripts/` and `templates/` live at the repo root.
+| Skill | Used by | Role |
+|---|---|---|
+| [`hstack`](skills/hstack/SKILL.md) | frontier (e.g. Muse Wonder) | Senior engineer: intake, plan review, checkpoint directives, final review, token discipline |
+| [`hstack-lead`](skills/hstack-lead/SKILL.md) | small model (e.g. Muse Spark) | Owns the task end to end: spec, plan, fan-out, tests, build, independent review, checkpoints |
+| [`hstack-practice`](skills/hstack-practice/SKILL.md) | small model (e.g. Muse Spark) | Engineering practice: exact specs, state tables, tests, real environment, security, honest reporting |
 
 ## Install
 
-Clone once, then link every skill into your harness:
-
 ```bash
 git clone https://github.com/shellhaki/hstack ~/hstack
-cd ~/hstack
-
-./install.sh claude     # ~/.claude/skills
-./install.sh codex      # ~/.codex/skills
-./install.sh muse       # ~/.config/muse/skills
-./install.sh <dir>      # any other harness's skills folder
+~/hstack/install.sh muse       # links all skills into ~/.config/muse/skills
 ```
 
-The skills are symlinks, so `git -C ~/hstack pull` updates all of them. For a harness without a skills folder, tell the agent to "follow `~/hstack/skills/hstack/SKILL.md`".
-
-**Requirements:** `git`, `bash`, and the worker CLI on your `PATH` (`muse` by default). Optional: macOS Terminal for visible windows, or `tmux`.
+Requirements: `git`, `bash`, Muse Code (`muse`), and macOS Terminal for the optional progress window.
 
 ## Use
 
-Ask your orchestrator in plain language:
+In Muse Code, with Muse Wonder as the model:
 
-> Use hstack to build email sign-in with likes and comments. Write the plan in `specs/` first, then orchestrate Muse workers and verify everything before merging.
+> Use hstack to add email sign-in with likes and comments to this app.
 
-The `hstack` skill walks the orchestrator through `hstack-plan`, `hstack-run` and `hstack-verify`. You'll see one window per worker and a live progress view, and get one final report.
+The frontier writes the intake, starts the Muse lead, and waits. One progress window shows the lead's checkpoints and the files it's writing. You get a single report at the end.
 
 ### Scripts
 
-All of them take an orchestration directory, for example `../myrepo-orch`.
-
-| Script | What it does |
-|---|---|
-| `scripts/setup.sh <repo> <orch> <name>...` | Snapshot the working tree (uncommitted work included, ignored files excluded) and create one worktree per worker |
-| `scripts/run.sh <orch>` | Launch every worker, open the live progress view, wait, close it, print results |
-| `scripts/progress.sh <orch>` | Live view of the files each worker is writing |
-| `scripts/collect.sh <orch>` | One patch per worker, check each stayed in its files, optionally run checks in each worktree |
-| `scripts/merge.sh <orch>` | Apply all patches to your main working tree (stops on conflict) |
-| `scripts/cleanup.sh <orch> --yes` | Remove worktrees and `orch/*` branches (logs and patches are kept) |
-
-### Configuration
-
-| Variable | Default | Purpose |
+| Script | Who runs it | What it does |
 |---|---|---|
-| `AGENT_CMD` | `muse exec --prompt-file {prompt}` | Worker command; `{prompt}` becomes the task file path |
-| `TASKS_DIR` | `specs/tasks` | Where task files live inside the repo |
-| `MODE` | `progress` on macOS | `progress` (headless workers, one progress window), `windows`, `tmux` or `headless` |
-| `DELAY` | `0` | Seconds to wait before launching (handy for screen recording) |
-| `TIMEOUT_MIN` | `120` | Give up waiting after this long |
-| `LINK_DIRS` | `node_modules` | Ignored directories to symlink into each worktree |
-| `SETUP_CMD` | none | Command run in each new worktree (e.g. `npx next typegen`) |
-| `VERIFY_CMD` | none | Checks run in each worktree by `collect.sh` |
+| `scripts/start.sh <repo> <orch> <name> <intake>` | frontier | Snapshot the repo into a worktree and start the Muse lead in the background |
+| `scripts/wait.sh <worktree>` | frontier, in the background | Block until the lead posts a checkpoint (`EVENT <id> <file>`) or exits |
+| `scripts/direct.sh <worktree> <id>` | frontier | Answer a checkpoint: `APPROVE`, `REVISE` or `ANSWER`, plus WHY / WHAT / HOW |
+| `scripts/await.sh <id>` | lead | Block until the frontier answers |
+| `scripts/progress.sh <worktree>` | you | Live view of checkpoints and files |
+| `scripts/collect.sh`, `merge.sh`, `cleanup.sh` | frontier | Turn the worktree into a patch, apply it to your tree, clean up |
 
-### Templates
+## Benchmarks
 
-`templates/spec.md`, `templates/_common.md` (rules every worker follows), `templates/task.md` (one per worker, with input-to-output examples and a state table) and `templates/brief-checklist.md`, the specificity checklist every brief must pass, because small models guess at whatever a brief leaves out. Add a `<name>.owns` file with one glob per line to have `collect.sh` flag edits outside a worker's files.
+Every benchmark compares the same task done by the frontier alone against hstack. Both use exact token counts and are judged by a hidden acceptance suite that neither side sees. Results go in [`benchmarks/`](benchmarks/) whatever they show.
 
-## Safety
+| Benchmark | Frontier alone | hstack | Hidden tests |
+|---|---:|---:|---|
+| [1: six engine modules](benchmarks/01-engine-modules/results.md) | $2.46 | **$1.59 (-35%)**: frontier $1.49 + small model $0.10 | 82/82 · 82/82 |
 
-- Workers never commit, push, or touch your real branch. They only change their own worktree.
-- Nothing reaches your code until the orchestrator has verified it and applied the patches.
-- Workers are told not to use the network, real databases or secrets. Real-service tests are run only by the orchestrator, with sandbox addresses and cleanup.
-- `cleanup.sh` refuses to delete anything without `--yes`.
+## Roadmap
+
+- More harnesses as frontier and small model: Claude Code, Cursor and OpenCode, starting from Muse.
+- In-harness orchestration: harnesses that run several models themselves direct their own small models.
+- More worker skills, per stack and per domain.
 
 ## License
 
-Not chosen yet.
+See [LICENSE](LICENSE).
