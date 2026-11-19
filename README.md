@@ -48,23 +48,60 @@ So hstack takes that to its end. The small model does everything it can, and the
 | [`hstack`](skills/hstack/SKILL.md) | frontier (e.g. Muse Wonder) | Senior engineer: intake, plan review, checkpoint directives, final review, token discipline |
 | [`hstack-lead`](skills/hstack-lead/SKILL.md) | small model (e.g. Muse Spark) | Owns the task end to end: spec, plan, fan-out, tests, build, independent review, checkpoints |
 | [`hstack-practice`](skills/hstack-practice/SKILL.md) | small model (e.g. Muse Spark) | Engineering practice: exact specs, state tables, tests, real environment, security, honest reporting |
+| [`hstack-activate`](skills/hstack-activate/SKILL.md) | frontier | `/hstack-activate`: turns hstack on for the session, or stays off if your model is already the smallest |
 
 ## Install
 
 ```bash
-git clone https://github.com/shellhaki/hstack ~/hstack
-~/hstack/install.sh muse       # links all skills into ~/.config/muse/skills
+curl -fsSL https://hstack.shellhaki.dev/install | sh
 ```
 
-Requirements: `git`, `bash`, Muse Code (`muse`), and macOS Terminal for the optional progress window.
+The installer downloads the `hstack` CLI and walks you through setup:
+1. **Agent:** Muse Code for now. Claude Code, Cursor and OpenCode come later.
+2. **Frontier model:** the model you run sessions with, which directs.
+3. **Small model:** the model that does the engineering. Pick `auto` (the best-ranked model below your frontier) or a specific one. Every lower-ranked model is kept as a fallback, so if a model isn't on your plan the next one starts automatically.
+
+It installs the skills into `~/.config/hstack` (linked into your agent's skills folder) and saves your choices in `~/.config/hstack/config.json`.
+
+From source: `go install github.com/shellhaki/hstack/cmd/hstack@latest && hstack`. Or clone the repo and run `./install.sh muse`.
+
+### CLI
+
+| Command | What it does |
+|---|---|
+| `hstack` | Interactive setup (same as `hstack init`) |
+| `hstack init --agent muse --frontier <id> --small <id\|auto> --yes` | Non-interactive setup |
+| `hstack models` | Model rankings, the benchmarks behind them, and credits |
+| `hstack status` | Show your saved setup |
+| `hstack uninstall` | Remove the skill links, and optionally `~/.config/hstack` |
 
 ## Use
 
-In Muse Code, with Muse Wonder as the model:
+1. Start your agent on the frontier model, e.g. `muse --model muse-wonder-1.0`.
+2. Run **`/hstack-activate`**. If your session's model ranks above your small model, hstack turns on. If you're already on the smallest model, it says so and stays out of the way, because there is nothing cheaper to delegate to.
+3. Give it a task:
 
-> Use hstack to add email sign-in with likes and comments to this app.
+   > Use hstack to add email sign-in with likes and comments to this app.
 
-The frontier writes the intake, starts the Muse lead, and waits. One progress window shows the lead's checkpoints and the files it's writing. You get a single report at the end.
+The frontier writes the intake, starts the small-model lead, and waits. One progress window shows the lead's checkpoints and the files it's writing. You get a single report at the end. Small tasks are done directly, without delegation.
+
+### Model rankings
+
+hstack picks and orders models using published benchmark results. These live in [`models/muse.json`](models/muse.json); run `hstack models` to see them.
+
+| Model | Score | FrontierCode | Terminal-Bench | SWE-Atlas | Cost / task |
+|---|---:|---:|---:|---:|---:|
+| Muse Wonder Full | 54 | 35 | 60 | 69 | not published |
+| Muse Wonder | 44 | 24 | 47 | 62 | $7.59 |
+| Muse Ember | 40 | 21 | 43 | 55 | $0.22 |
+| Muse Spark 1.3 | 37 | 22 | 30 | 59 | $4.34 |
+
+Benchmarks:
+- **FrontierCode-AA 2.0:** complex repository engineering
+- **Terminal-Bench 4.1:** terminal and command-line execution
+- **SWE-Atlas-QnA-AA:** software engineering knowledge and problem-solving
+
+Credit goes to the maintainers of these benchmarks; hstack only reorders their published numbers. For other agents, hstack will use the same approach with benchmarks such as SWE-bench Pro, SWE-bench Verified, Terminal-Bench and FrontierCode, credited the same way.
 
 ### Scripts
 
@@ -85,11 +122,16 @@ Every benchmark compares the same task done by the frontier alone against hstack
 |---|---:|---:|---|
 | [1: six engine modules](benchmarks/01-engine-modules/results.md) | $2.46 | **$1.59 (-35%)**: frontier $1.49 + small model $0.10 | 82/82 · 82/82 |
 
+## History
+
+hstack went through three designs. The first had the frontier write specs and briefs and came out 10% cheaper at best. The current design moves all writing to the small model and comes out 35% cheaper. [docs/HISTORY.md](docs/HISTORY.md) covers each version, its benchmarks, and every change that cut the cost.
+
 ## Roadmap
 
+- **Skill bank (next):** a curated set of skills that make the small model better on its own (stack conventions, testing, security, framework and driver behavior), so the frontier corrects less.
+- **Frontier optimizations:** a persistent frontier session, merge by script, a lighter base prompt, and fewer checkpoints for low-risk tasks. Estimated 75–85% cheaper than frontier alone; see [HISTORY](docs/HISTORY.md#where-the-cost-is-now-and-whats-next).
 - More harnesses as frontier and small model: Claude Code, Cursor and OpenCode, starting from Muse.
 - In-harness orchestration: harnesses that run several models themselves direct their own small models.
-- More worker skills, per stack and per domain.
 
 ## License
 
