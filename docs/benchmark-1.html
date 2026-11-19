@@ -1,0 +1,339 @@
+<title>hstack Benchmark 1</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one 1080px report column. Hero verdict, then four evidence panels in a 2-col grid. */
+:root {
+  --bg: #f5f6f8;
+  --panel: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --ink-3: #8a8983;
+  --line: #e2e3e6;
+  --frontier: #2a78d6;   /* series 1: frontier model (Muse Wonder) */
+  --small: #eb6834;      /* series 2: small model (Muse Spark contributor) */
+  --good: #008300;
+  --display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111214; --panel: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --ink-3: #8f8e86;
+    --line: #2c2d30; --frontier: #3987e5; --small: #d95926; --good: #0ca30c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111214; --panel: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --ink-3: #8f8e86;
+  --line: #2c2d30; --frontier: #3987e5; --small: #d95926; --good: #0ca30c; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 48px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 20px; }
+h1, h2 { font-family: var(--display); text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(28px, 4.2vw, 44px); line-height: 1.05; letter-spacing: -0.02em; }
+h2 { font-size: 18px; font-weight: 700; }
+.eyebrow { font: 600 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.sub { color: var(--ink-2); max-width: 70ch; margin: 8px 0 0; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; min-width: 0; }
+.panel p.note { color: var(--ink-2); font-size: 13px; margin: 6px 0 0; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+
+/* Hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 28px; align-items: end; }
+@media (max-width: 760px) { .hero { grid-template-columns: 1fr; } }
+.verdict { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-top: 14px; }
+.verdict .big { font: 700 clamp(56px, 9vw, 96px)/0.9 var(--display); letter-spacing: -0.04em; }
+.verdict .big-label { font: 500 18px var(--display); color: var(--ink-2); max-width: 16ch; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.stat { border-top: 2px solid var(--line); padding-top: 8px; }
+.stat .v { font: 600 22px var(--mono); }
+.stat .k { font-size: 12px; color: var(--ink-2); }
+.models { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--ink-2); margin-top: 16px; }
+.key { display: inline-flex; align-items: center; gap: 8px; }
+.swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+svg text { fill: var(--ink-2); font: 12px var(--body); }
+svg .val { fill: var(--ink); font: 600 13px var(--mono); }
+svg .axis { stroke: var(--line); stroke-width: 1; }
+svg .grid { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 4; }
+svg .tick { fill: var(--ink-3); font: 11px var(--mono); }
+svg .mark { cursor: default; }
+svg .mark:hover { opacity: 0.85; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--ink-3); font-weight: 600; font-size: 12px; }
+.table-wrap { overflow-x: auto; }
+details summary { cursor: pointer; font-weight: 600; }
+details summary:focus-visible { outline: 2px solid var(--frontier); outline-offset: 2px; }
+.qual { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 10px; }
+.qual .q { border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.qual .q .v { font: 700 30px var(--display); }
+.pill { display: inline-flex; align-items: center; gap: 6px; font: 600 12px var(--mono); color: var(--good); }
+.pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
+footer { color: var(--ink-3); font-size: 12px; max-width: 90ch; }
+
+#tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); font: 12px/1.4 var(--body);
+  padding: 6px 9px; border-radius: 6px; max-width: 260px; opacity: 0; transition: opacity .1s; z-index: 5; }
+@media (prefers-reduced-motion: reduce) { #tip { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header class="panel hero">
+    <div>
+      <div class="eyebrow">hstack · benchmark 1 · six engine modules</div>
+      <h1>Same code quality. A third less spend.</h1>
+      <p class="sub">One task built twice: a frontier model alone, and hstack, where the frontier only directs and a small model does the work. Same spec, same hidden test suite.</p>
+      <div class="models">
+        <span class="key"><span class="swatch" style="background:var(--frontier)"></span>Frontier: Muse Wonder 1.0</span>
+        <span class="key"><span class="swatch" style="background:var(--small)"></span>Small model: Muse Spark 1.3 Contributor</span>
+      </div>
+    </div>
+    <div>
+      <div class="verdict"><span class="big num">−35%</span><span class="big-label">total cost with hstack</span></div>
+      <div class="stats" style="margin-top:18px">
+        <div class="stat"><div class="v">$1.59</div><div class="k">per task, vs $2.46 alone</div></div>
+        <div class="stat"><div class="v">82/82</div><div class="k">hidden tests, both runs</div></div>
+        <div class="stat"><div class="v">95%</div><div class="k">of output written by the small model</div></div>
+      </div>
+    </div>
+  </header>
+
+  <section class="panel">
+    <h2>Cost per run</h2>
+    <p class="note">hstack's bill is almost all frontier. The small model built six modules, 141 tests and a review pass for 10 cents.</p>
+    <svg id="cost" viewBox="0 0 1000 170" role="img" aria-label="Cost per run: solo $2.46 all frontier; hstack $1.49 frontier plus $0.10 small model, total $1.59"></svg>
+  </section>
+
+  <div class="grid2">
+    <section class="panel">
+      <h2>Who did the writing</h2>
+      <p class="note">Output and reasoning tokens. In hstack the frontier wrote an intake and two approvals.</p>
+      <svg id="out" viewBox="0 0 480 150" role="img" aria-label="Output tokens: solo 54k frontier; hstack 9k frontier and 168k small model"></svg>
+    </section>
+    <section class="panel">
+      <h2>Where the frontier's money went</h2>
+      <p class="note">Most of hstack's frontier cost is reading context on 4 fresh calls, not writing. That is the next thing to cut.</p>
+      <svg id="anatomy" viewBox="0 0 480 172" role="img" aria-label="Frontier cost by token type for solo and hstack"></svg>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2>Timeline</h2>
+    <p class="note">hstack ran 2.9× longer. Most of the extra time is the independent reviewer sub-agent (5 min) and waiting for the slowest of six parallel builders.</p>
+    <svg id="time" viewBox="0 0 1000 200" role="img" aria-label="Timeline: solo 4.3 minutes; hstack 12.4 minutes with phases"></svg>
+  </section>
+
+  <div class="grid2">
+    <section class="panel">
+      <h2>The frontier's four calls in hstack</h2>
+      <p class="note">Each call is a decision. What it wrote is shown under each bar.</p>
+      <svg id="calls" viewBox="0 0 480 190" role="img" aria-label="hstack frontier calls: intake $0.38, plan review $0.46, done review $0.46, merge $0.18"></svg>
+    </section>
+    <section class="panel">
+      <h2>Quality</h2>
+      <p class="note">Judged by an 82-test acceptance suite neither run saw, plus a strict type check.</p>
+      <div class="qual">
+        <div class="q"><div class="eyebrow">Frontier alone</div><div class="v num">82/82</div><span class="pill">tsc clean</span></div>
+        <div class="q"><div class="eyebrow">hstack</div><div class="v num">82/82</div><span class="pill">tsc clean</span></div>
+      </div>
+      <p class="note" style="margin-top:12px">In hstack, the small model's own reviewer sub-agent found 2 real bugs before the frontier ever looked: a template lookup error and a cron weekday mismatch. Both were fixed with regression tests.</p>
+    </section>
+  </div>
+
+  <section class="panel">
+    <details>
+      <summary>Data table</summary>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Run / model</th><th>Calls</th><th>Input tokens</th><th>of which cached</th><th>Output + reasoning</th><th>Cost (USD)</th></tr></thead>
+          <tbody>
+            <tr><td>Solo · Wonder</td><td>48</td><td>1,482,952</td><td>1,199,376</td><td>54,385</td><td>2.4619</td></tr>
+            <tr><td>hstack · Wonder (frontier)</td><td>39</td><td>636,741</td><td>327,164</td><td>9,265</td><td>1.4890</td></tr>
+            <tr><td>hstack · Spark contributor (lead + 7 sub-agents)</td><td>215</td><td>4,643,190</td><td>4,066,565</td><td>168,146</td><td>0.0994</td></tr>
+            <tr><td><strong>hstack total</strong></td><td>254</td><td>5,279,931</td><td>4,393,729</td><td>177,411</td><td><strong>1.5884</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+
+  <footer>
+    Method: one run each, 2026-11-19. Exact token counts from Muse's session logs, including every sub-agent. Prices per 1M tokens (cached / input / output): Wonder $0.20 / $4 / $20; Spark 1.3 Contributor $0.002 / $0.10 / $0.20. Reasoning billed as output. Task, hidden suite and runner: github.com/shellhaki/hstack/benchmarks.
+  </footer>
+</div>
+<div id="tip" role="tooltip"></div>
+
+<script>
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs = {}, parent) => {
+  const n = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  if (parent) parent.appendChild(n);
+  return n;
+};
+const text = (parent, x, y, s, attrs = {}) => { const t = el("text", { x, y, ...attrs }, parent); t.textContent = s; return t; };
+const tip = document.getElementById("tip");
+const hover = (node, msg) => {
+  node.classList.add("mark");
+  node.addEventListener("mousemove", (e) => {
+    tip.textContent = msg; tip.style.opacity = 1;
+    tip.style.left = Math.min(e.clientX + 14, innerWidth - 270) + "px"; tip.style.top = e.clientY + 14 + "px";
+  });
+  node.addEventListener("mouseleave", () => (tip.style.opacity = 0));
+};
+const C = { f: "var(--frontier)", s: "var(--small)" };
+// A bar with a rounded data end and a square base (marks spec).
+const bar = (g, x, y, w, h, fill, roundEnd = true) => {
+  const r = Math.min(4, w / 2, h / 2);
+  const d = roundEnd
+    ? `M${x},${y} H${x + w - r} Q${x + w},${y} ${x + w},${y + r} V${y + h - r} Q${x + w},${y + h} ${x + w - r},${y + h} H${x} Z`
+    : `M${x},${y} H${x + w} V${y + h} H${x} Z`;
+  return el("path", { d, fill }, g);
+};
+const axisX = (svg, x0, x1, yTop, yBot, max, step, fmt) => {
+  for (let v = 0; v <= max + 1e-9; v += step) {
+    const x = x0 + (v / max) * (x1 - x0);
+    el("line", { x1: x, x2: x, y1: yTop, y2: yBot, class: v === 0 ? "axis" : "grid" }, svg);
+    text(svg, x, yBot + 16, fmt(v), { class: "tick", "text-anchor": "middle" });
+  }
+};
+
+// 1. Cost per run
+(() => {
+  const svg = document.getElementById("cost");
+  const x0 = 150, x1 = 940, max = 2.5, sx = (v) => (v / max) * (x1 - x0);
+  axisX(svg, x0, x1, 10, 140, max, 0.5, (v) => "$" + v.toFixed(2));
+  const rows = [
+    { label: "Frontier alone", y: 24, parts: [{ v: 2.4619, c: C.f, t: "Wonder: $2.46" }] },
+    { label: "hstack", y: 84, parts: [{ v: 1.489, c: C.f, t: "Wonder (frontier): $1.49" }, { v: 0.0994, c: C.s, t: "Spark lead + 7 sub-agents: $0.10" }] },
+  ];
+  for (const r of rows) {
+    text(svg, x0 - 12, r.y + 25, r.label, { "text-anchor": "end", style: "font:600 14px var(--body);fill:var(--ink)" });
+    let x = x0;
+    r.parts.forEach((p, i) => {
+      const w = sx(p.v) - (i < r.parts.length - 1 ? 2 : 0);
+      hover(bar(svg, x, r.y, Math.max(w, 2), 40, p.c, i === r.parts.length - 1), p.t);
+      x += sx(p.v);
+    });
+    const total = r.parts.reduce((a, p) => a + p.v, 0);
+    text(svg, x + 10, r.y + 26, "$" + total.toFixed(2), { class: "val" });
+    if (r.parts.length > 1) text(svg, x + 70, r.y + 26, "← small model: $0.10", { style: "fill:var(--ink-2);font:12px var(--body)" });
+  }
+})();
+
+// 2. Output tokens (own scale)
+(() => {
+  const svg = document.getElementById("out");
+  const x0 = 110, x1 = 440, max = 180000, sx = (v) => (v / max) * (x1 - x0);
+  axisX(svg, x0, x1, 8, 112, max, 60000, (v) => (v / 1000) + "k");
+  const rows = [
+    { label: "Frontier alone", y: 20, parts: [{ v: 54385, c: C.f, t: "Wonder wrote 54,385 tokens" }] },
+    { label: "hstack", y: 64, parts: [{ v: 9265, c: C.f, t: "Wonder wrote 9,265 tokens" }, { v: 168146, c: C.s, t: "Spark wrote 168,146 tokens" }] },
+  ];
+  for (const r of rows) {
+    text(svg, x0 - 10, r.y + 19, r.label, { "text-anchor": "end", style: "font:600 13px var(--body);fill:var(--ink)" });
+    let x = x0;
+    r.parts.forEach((p, i) => {
+      const w = sx(p.v) - (i < r.parts.length - 1 ? 2 : 0);
+      hover(bar(svg, x, r.y, Math.max(w, 2), 30, p.c, i === r.parts.length - 1), p.t);
+      x += sx(p.v);
+    });
+    const total = r.parts.reduce((a, p) => a + p.v, 0);
+    if (x + 8 < 470) text(svg, Math.min(x + 6, 448), r.y - 4, Math.round(total / 1000) + "k", { class: "val", "text-anchor": x > 420 ? "end" : "start" });
+  }
+})();
+
+// 3. Frontier cost anatomy (own scale): uncached input / cached input / output+reasoning
+(() => {
+  const svg = document.getElementById("anatomy");
+  const x0 = 110, x1 = 440, max = 2.5, sx = (v) => (v / max) * (x1 - x0);
+  axisX(svg, x0, x1, 8, 112, max, 0.5, (v) => "$" + v.toFixed(1));
+  const rows = [
+    { label: "Frontier alone", y: 20, parts: [[1.1343, "reading new context"], [0.2399, "re-reading cached context"], [1.0877, "writing (output + reasoning)"]] },
+    { label: "hstack frontier", y: 64, parts: [[1.2383, "reading new context"], [0.0654, "re-reading cached context"], [0.1853, "writing (output + reasoning)"]] },
+  ];
+  const shades = [1, 0.45, 0.7];
+  for (const r of rows) {
+    text(svg, x0 - 10, r.y + 19, r.label, { "text-anchor": "end", style: "font:600 13px var(--body);fill:var(--ink)" });
+    let x = x0;
+    r.parts.forEach(([v, what], i) => {
+      const w = sx(v) - (i < 2 ? 2 : 0);
+      const b = bar(svg, x, r.y, Math.max(w, 2), 30, C.f, i === 2);
+      b.setAttribute("fill-opacity", shades[i]);
+      hover(b, `${what}: $${v.toFixed(2)}`);
+      x += sx(v);
+    });
+  }
+  // legend for the three shades
+  const ly = 160; let lx = 110;
+  [["reading new context", 1], ["cached", 0.45], ["writing", 0.7]].forEach(([s, o]) => {
+    el("rect", { x: lx, y: ly - 10, width: 12, height: 12, rx: 3, fill: C.f, "fill-opacity": o }, svg);
+    text(svg, lx + 18, ly, s); lx += s.length * 6.4 + 46;
+  });
+})();
+
+// 4. Timeline (seconds from start)
+(() => {
+  const svg = document.getElementById("time");
+  const x0 = 150, x1 = 960, max = 780, sx = (v) => x0 + (v / max) * (x1 - x0);
+  for (let m = 0; m <= 13; m++) {
+    const x = sx(m * 60);
+    el("line", { x1: x, x2: x, y1: 10, y2: 170, class: m === 0 ? "axis" : "grid" }, svg);
+    if (m % 2 === 0) text(svg, x, 186, m + " min", { class: "tick", "text-anchor": "middle" });
+  }
+  const lane = (label, y, segs) => {
+    text(svg, x0 - 12, y + 21, label, { "text-anchor": "end", style: "font:600 14px var(--body);fill:var(--ink)" });
+    segs.forEach(([a, b, who, name, show]) => {
+      const w = Math.max(sx(b) - sx(a) - 2, 2);
+      hover(bar(svg, sx(a), y, w, 32, who === "f" ? C.f : C.s, true), `${name}: ${a}s → ${b}s (${b - a}s)`);
+      if (show) text(svg, sx(a) + w / 2, y + 50, name, { "text-anchor": "middle", style: "font:11px var(--body);fill:var(--ink-2)" });
+    });
+  };
+  lane("Frontier alone", 20, [[0, 260, "f", "Wonder builds everything", true]]);
+  lane("hstack", 100, [
+    [0, 34, "f", "intake", false],
+    [34, 74, "s", "lead plans", false],
+    [74, 97, "f", "plan review", false],
+    [97, 321, "s", "6 builders in parallel", true],
+    [321, 329, "s", "integrate", false],
+    [329, 629, "s", "independent reviewer", true],
+    [629, 672, "s", "fixes 2 bugs", false],
+    [672, 695, "f", "done review", false],
+    [695, 742, "f", "merge", false],
+  ]);
+  text(svg, sx(260) + 8, 41, "4.3 min", { class: "val" });
+  text(svg, sx(742) + 8, 121, "12.4 min", { class: "val" });
+})();
+
+// 5. hstack frontier calls
+(() => {
+  const svg = document.getElementById("calls");
+  const calls = [["Intake", 0.3843, "~20-line intake"], ["Plan review", 0.4629, "\"APPROVE\""], ["Done review", 0.4618, "checks + \"APPROVE\""], ["Merge", 0.18, "ran merge script"]];
+  const yb = 120, h = 100, max = 0.5, bw = 70, gap = (440 - 4 * bw) / 3, xs = 30;
+  for (let v = 0; v <= max + 1e-9; v += 0.25) {
+    const y = yb - (v / max) * h;
+    el("line", { x1: xs - 6, x2: 470, y1: y, y2: y, class: v === 0 ? "axis" : "grid" }, svg);
+    text(svg, xs - 10, y + 4, "$" + v.toFixed(2), { class: "tick", "text-anchor": "end" });
+  }
+  calls.forEach(([name, v, wrote], i) => {
+    const x = xs + 10 + i * (bw + gap), bh = (v / max) * h, y = yb - bh, r = 4;
+    const d = `M${x},${yb} V${y + r} Q${x},${y} ${x + r},${y} H${x + bw - r} Q${x + bw},${y} ${x + bw},${y + r} V${yb} Z`;
+    hover(el("path", { d, fill: C.f }, svg), `${name}: $${v.toFixed(2)}, wrote ${wrote}`);
+    text(svg, x + bw / 2, y - 6, "$" + v.toFixed(2), { class: "val", "text-anchor": "middle" });
+    text(svg, x + bw / 2, yb + 18, name, { "text-anchor": "middle", style: "font:600 12px var(--body);fill:var(--ink)" });
+    text(svg, x + bw / 2, yb + 34, wrote, { "text-anchor": "middle", style: "font:11px var(--body);fill:var(--ink-3)" });
+  });
+})();
+</script>

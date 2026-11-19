@@ -1,0 +1,144 @@
+<title>hstack Cost Comparison</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* One frame for screen recording: two cost meters run at the same rate; the cheaper one stops first. Then cost and quality results. */
+:root {
+  --bg: #17181b;
+  --track: #212327;
+  --ink: #f0efec;
+  --ink-3: #75746d;
+  --frontier: #3987e5;
+  --small: #d95926;
+  --good: #3fb34f;
+  --display: "Space Grotesk", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--display);
+  display: grid; place-items: center;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px;
+}
+/* Sizes come from the frame's own width (container query units), so desktop, tablet and phone all scale cleanly. */
+.frame { width: min(100%, 1200px); container-type: inline-size; display: grid; gap: clamp(28px, 5cqi, 56px); position: relative; padding-top: 44px; }
+.caption { font: 600 clamp(12px, 1.6cqi, 18px) var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: calc(-1 * clamp(10px, 2cqi, 28px)); }
+.lanes { display: grid; gap: clamp(24px, 4.5cqi, 48px); }
+.lane {
+  display: grid; align-items: center; column-gap: clamp(12px, 2.5cqi, 32px); row-gap: 10px;
+  grid-template-columns: clamp(140px, 19cqi, 230px) minmax(0, 1fr) max-content;
+  grid-template-areas: "who track cost" ". status status";
+}
+.who { grid-area: who; font-weight: 700; font-size: clamp(18px, 2.6cqi, 30px); line-height: 1.1; min-width: 0; }
+.who span { display: block; font: 400 max(12px, 0.55em)/1.4 var(--mono); color: var(--ink-3); margin-top: 0.35em; }
+.track { grid-area: track; height: clamp(36px, 6.5cqi, 76px); background: var(--track); border-radius: 12px; position: relative; overflow: hidden; }
+.seg { position: absolute; top: 0; bottom: 0; left: 0; width: 0; }
+.seg.f { background: var(--frontier); border-radius: 12px; }
+.seg.s { background: var(--small); border-radius: 0 12px 12px 0; }
+.cost { grid-area: cost; font: 600 clamp(24px, 4.6cqi, 52px)/1 var(--mono); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.status { grid-area: status; font: clamp(12px, 1.6cqi, 18px)/1.4 var(--mono); color: var(--ink-3); min-height: 1.4em; }
+.status.done { color: var(--good); }
+
+.results {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(20px, 3cqi, 40px);
+  padding-left: calc(clamp(140px, 19cqi, 230px) + clamp(12px, 2.5cqi, 32px));
+  opacity: 0; transform: translateY(12px); transition: opacity .6s, transform .6s;
+}
+.results.show { opacity: 1; transform: none; }
+.metric .big { font: 700 clamp(48px, 9cqi, 96px)/0.95 var(--display); letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+.metric .label { font: clamp(12px, 1.6cqi, 18px)/1.4 var(--mono); color: var(--ink-3); margin-top: 0.6em; }
+
+/* Phone: name and cost on one line, the bar full width underneath. */
+@container (max-width: 620px) {
+  .lane { grid-template-columns: minmax(0, 1fr) max-content; grid-template-areas: "who cost" "track track" "status status"; }
+  .results { padding-left: 0; }
+  .metric .big { font-size: clamp(40px, 15cqi, 64px); }
+}
+
+button {
+  position: absolute; right: 0; top: 0; font: 600 12px var(--mono); color: var(--ink-3);
+  background: transparent; border: 1px solid #2a2c30; border-radius: 999px; padding: 0.4em 0.9em; cursor: pointer;
+}
+button:hover { color: var(--ink); }
+button:focus-visible { outline: 2px solid var(--frontier); outline-offset: 2px; }
+.recording button { visibility: hidden; }
+</style>
+
+<div class="frame" id="frame">
+  <button id="replay" type="button" aria-label="Replay animation (R)">Replay ↻</button>
+  <div class="caption">Cost to build the same task</div>
+  <div class="lanes">
+    <div class="lane">
+      <div class="who">Frontier alone<span>Muse Wonder 1.0</span></div>
+      <div class="track"><div class="seg f" id="soloBar"></div></div>
+      <div class="cost" id="soloCost">$0.00</div>
+      <div class="status" id="soloStatus"></div>
+    </div>
+    <div class="lane">
+      <div class="who">hstack<span>Wonder directs · Spark builds</span></div>
+      <div class="track"><div class="seg f" id="hsF"></div><div class="seg s" id="hsS"></div></div>
+      <div class="cost" id="hsCost">$0.00</div>
+      <div class="status" id="hsStatus"></div>
+    </div>
+  </div>
+
+  <div class="results" id="results">
+    <div class="metric"><div class="big">−35%</div><div class="label">cost · $1.59 vs $2.46</div></div>
+    <div class="metric"><div class="big">100%</div><div class="label">quality · 82/82 hidden tests, both runs</div></div>
+  </div>
+</div>
+
+<script>
+// Final costs from the real run. Both bars grow at the same dollar rate, so the cheaper run simply stops sooner.
+const SOLO = 2.4619, HS_F = 1.489, HS_S = 0.0994, HS = HS_F + HS_S;
+const MAX = 2.5, GROW_MS = 6500;
+const $ = (id) => document.getElementById(id);
+const fmt = (v) => "$" + v.toFixed(2);
+
+function render(d) {              // d = dollars spent so far, same for both lanes until each is done
+  const sc = Math.min(d, SOLO);
+  $("soloBar").style.width = (sc / MAX) * 100 + "%";
+  $("soloCost").textContent = fmt(sc);
+  const soloDone = d >= SOLO;
+  $("soloStatus").textContent = soloDone ? "task complete · 82/82 tests passed" : "";
+  $("soloStatus").classList.toggle("done", soloDone);
+
+  const h = Math.min(d, HS), f = Math.min(h, HS_F), sm = Math.max(h - HS_F, 0);
+  const fw = (f / MAX) * 100;
+  $("hsF").style.width = fw + "%";
+  $("hsF").style.borderRadius = sm > 0 ? "12px 0 0 12px" : "12px";
+  $("hsS").style.left = fw + "%";
+  $("hsS").style.width = sm > 0 ? Math.max((sm / MAX) * 100, 0.4) + "%" : "0%";
+  $("hsCost").textContent = fmt(h);
+  const hsDone = d >= HS;
+  $("hsStatus").textContent = hsDone ? "task complete · 82/82 tests passed · small model: $0.10" : "";
+  $("hsStatus").classList.toggle("done", hsDone);
+}
+
+let raf;
+function play() {
+  cancelAnimationFrame(raf);
+  $("results").classList.remove("show");
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { render(SOLO); $("results").classList.add("show"); return; }
+  render(0);
+  const start = performance.now() + 600;
+  const tick = (now) => {
+    const x = Math.min(Math.max(0, now - start) / GROW_MS, 1);
+    const d = x * SOLO;                          // constant spend rate: a meter, not a race
+    render(d);
+    if (x < 1) raf = requestAnimationFrame(tick);
+    else setTimeout(() => $("results").classList.add("show"), 350);
+  };
+  raf = requestAnimationFrame(tick);
+}
+$("replay").addEventListener("click", play);
+addEventListener("keydown", (e) => {
+  if (e.key === "r" || e.key === "R") play();
+  if (e.key === "h" || e.key === "H") $("frame").classList.toggle("recording");
+});
+play();
+</script>

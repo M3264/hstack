@@ -23,20 +23,9 @@ So hstack takes that to its end. The small model does everything it can, and the
 
 ## How it works
 
-```
- you ──task──▶ frontier (senior engineer)
-                 │  intake: why, acceptance criteria, constraints, risks   (~20 lines)
-                 ▼
-               Muse lead (small model)
-                 │  explores, writes spec + plan + criteria→tests map
-                 │  ──▶ checkpoint: plan ──▶ frontier: APPROVE / REVISE (≤10 lines)
-                 │  builds: alone, or fans out to 1…N Muse sub-agents
-                 │  tests first, implements, runs an independent reviewer sub-agent
-                 │  ──▶ checkpoint: done ──▶ frontier: runs checks, spot-checks risks,
-                 │                             APPROVE / REVISE
-                 ▼
-               merge into your tree ──▶ report
-```
+![hstack workflow: the frontier writes the intake, a small-model lead plans and builds with sub-agents and an independent reviewer, and the frontier approves at the plan and done checkpoints](docs/hstack-flow.png)
+
+<sub>Source: [`docs/hstack-flow.excalidraw`](docs/hstack-flow.excalidraw), editable at excalidraw.com.</sub>
 
 - **Event-driven:** while the lead works, a script blocks and wakes the frontier only when a checkpoint arrives. There's no polling, and waiting costs no tokens.
 - **Worker count follows the task:** the lead decides whether to do it alone or fan out to 2 or 100 sub-agents, and the frontier approves that choice in the plan.
