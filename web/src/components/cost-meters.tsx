@@ -8,7 +8,7 @@ const fmt = (v: number) => "$" + v.toFixed(2);
 
 export function CostMeters() {
   const [d, setD] = useState(0);
-  const [started, setStarted] = useState(false);
+  const started = useRef(false);
   const ref = useRef<HTMLDivElement>(null);
   const raf = useRef(0);
 
@@ -24,14 +24,21 @@ export function CostMeters() {
     raf.current = requestAnimationFrame(tick);
   }
 
-  // Start when scrolled into view, once.
+  // Start when scrolled into view, once. The flag is a ref (not state) so starting doesn't
+  // re-run this effect, whose cleanup would cancel the animation it just started.
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting && !started) { setStarted(true); play(); } }, { threshold: 0.4 });
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && !started.current) {
+        started.current = true;
+        io.disconnect();
+        play();
+      }
+    }, { threshold: 0.3 });
     io.observe(el);
     return () => { io.disconnect(); cancelAnimationFrame(raf.current); };
-  }, [started]);
+  }, []);
 
   const solo = Math.min(d, SOLO), hs = Math.min(d, HS), f = Math.min(hs, HS_F), s = Math.max(hs - HS_F, 0);
   const done = d >= SOLO;
