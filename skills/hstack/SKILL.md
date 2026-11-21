@@ -21,6 +21,7 @@ CONSTRAINTS: <stack, off-limits files, no new deps, ...>
 RISKS I WILL REVIEW: <auth, data loss, money, user-facing output, ...>
 DONE WHEN: <exact commands, e.g. npm test, tsc>
 ```
+DONE WHEN must include the tests that cover every changed file. A typecheck alone never counts: it misses changed strings, names, paths and IDs. For a bulk or scripted edit (rename, find-and-replace, codemod), require a test baseline before the edit and the tests of every touched package after each batch, with no new failures.
 
 ## 2. Plan (worker)
 Call the Agent tool with `subagent_type: "hstack-worker"`, `model: "<worker alias>"`, and a prompt containing the brief plus "Phase 1: plan only." The worker explores, writes `PLAN.md`, and returns a plan report of at most 20 lines.
@@ -64,4 +65,5 @@ Don't commit or push unless asked.
 | The worker's spec drifts from what the user meant | Your brief states acceptance criteria up front, and plan review checks against them |
 | The worker's tests only confirm its own mistakes | You run the checks yourself, spot-check your risk areas, and in swarm mode an independent reviewer tries to break the work |
 | Review rounds add up | One correction round by default, and short directives |
+| A bulk edit passes the typecheck but breaks behavior (strings, names, paths that tests or other code still expect) | Baseline the tests first, run the tests of every touched package after each batch, and diff the failures against the baseline |
 | The task is too vague for a small model | Stay involved longer: more plan iterations, still terse |
