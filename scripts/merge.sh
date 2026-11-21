@@ -12,16 +12,19 @@ if [ ${#names[@]} -eq 0 ]; then
   for p in "$ORCH"/patches/*.patch; do names+=("$(basename "$p" .patch)"); done
 fi
 
+ERR=$(mktemp "${TMPDIR:-/tmp}/orch-merge.XXXXXX")
+trap 'rm -f "$ERR"' EXIT
+
 cd "$REPO"
 for n in "${names[@]}"; do
   p="$ORCH/patches/$n.patch"
   if [ ! -s "$p" ]; then echo "$n: empty patch, skipped"; continue; fi
-  if git apply --check --whitespace=nowarn "$p" 2>/tmp/orch-merge.err; then
+  if git apply --check --whitespace=nowarn "$p" 2>"$ERR"; then
     git apply --whitespace=nowarn "$p"
     echo "$n: applied"
   else
     echo "$n: CONFLICT, not applied:" >&2
-    cat /tmp/orch-merge.err >&2
+    cat "$ERR" >&2
     exit 1
   fi
 done

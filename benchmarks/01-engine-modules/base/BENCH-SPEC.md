@@ -1,4 +1,4 @@
-# Benchmark 2 task: six engine modules
+# Benchmark 1 task: six engine modules
 
 Implement six independent TypeScript modules in `src/`, each with thorough Vitest tests next to it (`src/<name>.test.ts`). No runtime dependencies. Strict TypeScript, and no `any`. Exported names and signatures must match exactly, because a hidden acceptance suite imports them. Every example below must hold exactly, character for character.
 

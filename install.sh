@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Install every hstack skill into an agent harness by symlinking skills/* into its skills folder.
 # Usage: ./install.sh claude|muse|<skills-dir>
-#   claude  ~/.claude/skills, read by Claude Code (frontier) and also by Muse Code
-#   muse    ~/.config/muse/skills (Muse only)
+#   muse    ~/.config/muse/skills (supported)
+#   claude  ~/.claude/skills (experimental: Claude Code as the frontier is not officially supported yet;
+#           Muse Code also reads this folder)
+# Prefer the hstack CLI (`hstack init`), which also records your models in ~/.config/hstack/config.json.
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)

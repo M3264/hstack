@@ -15,6 +15,7 @@ const skills = [
   { name: "hstack", for: "frontier", body: "The senior engineer: intake, plan review, terse directives, final review, token discipline." },
   { name: "hstack-lead", for: "small model", body: "Owns the task end to end: spec, plan, fan-out, tests-first build, independent review, checkpoints." },
   { name: "hstack-practice", for: "small model", body: "Engineering habits small models lack: exact specs, state tables, real-environment facts, security, honest reports." },
+  { name: "hstack-activate", for: "frontier", body: "Turns hstack on for the session, or stays off when your model is already the smallest one." },
 ];
 
 export default function Home() {
@@ -99,8 +100,8 @@ export default function Home() {
         <section id="skills" className="gutter scroll-mt-20 py-20">
           <div className="mx-auto max-w-6xl">
             <p className="font-mono text-xs uppercase tracking-[0.12em] text-ink-3">The skills</p>
-            <h2 className="mt-3 max-w-3xl text-[clamp(30px,4.5vw,52px)] font-semibold leading-tight tracking-[-0.03em]">Three skills today. A skill bank next.</h2>
-            <div className="mt-10 grid gap-4 md:grid-cols-3">
+            <h2 className="mt-3 max-w-3xl text-[clamp(30px,4.5vw,52px)] font-semibold leading-tight tracking-[-0.03em]">Four skills today. A skill bank next.</h2>
+            <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               {skills.map((s) => (
                 <article key={s.name} className="rounded-[20px] border border-line bg-surface p-6">
                   <div className="flex items-center justify-between">
