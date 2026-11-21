@@ -1,24 +1,22 @@
-// Command hstack installs the hstack skills for your coding agent and records which
-// frontier and small models to use.
+// Command hstack installs hstack for Claude Code: the skills (hstack, hstack-activate,
+// hstack-swarm, hstack-practice) and the worker sub-agents (hstack-worker, hstack-reviewer).
 //
 //	hstack            interactive setup (same as `hstack init`)
-//	hstack init       [--agent muse] [--frontier ID] [--small ID|auto] [--yes]
-//	hstack models     show the model rankings and where they come from
+//	hstack init       [--worker haiku] [--yes]
+//	hstack models     show the model list used to validate workers
 //	hstack status     show the saved setup
-//	hstack uninstall  remove the installed skills and setup
+//	hstack uninstall  remove the installed links and setup
 package main
 
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/shellhaki/hstack"
@@ -26,199 +24,90 @@ import (
 
 var version = "dev"
 
-// ---------- model rankings ----------
-
 type Model struct {
-	ID        string   `json:"id"`
-	Name      string   `json:"name"`
-	Composite *float64 `json:"composite"`
-	Frontier  *float64 `json:"frontiercode"`
-	Terminal  *float64 `json:"terminalbench"`
-	SWEAtlas  *float64 `json:"sweatlas"`
-	CostTask  *float64 `json:"cost_per_task"`
-	Minutes   *float64 `json:"minutes_per_task"`
-	Note      string   `json:"note"`
+	ID    string   `json:"id"`
+	Alias string   `json:"alias"`
+	Name  string   `json:"name"`
+	Names []string `json:"names"`
+	Note  string   `json:"note"`
 }
 
-type Rankings struct {
-	Agent      string `json:"agent"`
-	Updated    string `json:"updated"`
+type ModelList struct {
+	Updated    string  `json:"updated"`
+	OrderNote  string  `json:"order_note"`
+	Models     []Model `json:"models"`
 	Benchmarks []struct {
 		Name  string `json:"name"`
 		Tests string `json:"tests"`
 	} `json:"benchmarks"`
-	Source struct {
-		Name string `json:"name"`
-		URL  string `json:"url"`
-		Note string `json:"note"`
-	} `json:"source"`
-	Models []Model `json:"models"`
 }
-
-func loadRankings(agent string) (*Rankings, error) {
-	b, err := hstack.Assets.ReadFile("models/" + agent + ".json")
-	if err != nil {
-		return nil, fmt.Errorf("no model rankings for agent %q", agent)
-	}
-	var r Rankings
-	if err := json.Unmarshal(b, &r); err != nil {
-		return nil, err
-	}
-	return &r, nil
-}
-
-func score(m Model) float64 {
-	if m.Composite == nil {
-		return -1
-	}
-	return *m.Composite
-}
-
-// ranked returns models with an ID, best composite score first (unranked last).
-func (r *Rankings) ranked() []Model {
-	var out []Model
-	for _, m := range r.Models {
-		if m.ID != "" {
-			out = append(out, m)
-		}
-	}
-	sort.SliceStable(out, func(i, j int) bool { return score(out[i]) > score(out[j]) })
-	return out
-}
-
-func (r *Rankings) byID(id string) (Model, bool) {
-	for _, m := range r.Models {
-		if m.ID == id {
-			return m, true
-		}
-	}
-	return Model{}, false
-}
-
-// below returns ranked models that score strictly lower than the frontier: valid small models.
-func (r *Rankings) below(frontier string) []Model {
-	f, ok := r.byID(frontier)
-	var out []Model
-	for _, m := range r.ranked() {
-		if m.ID == frontier || score(m) < 0 {
-			continue
-		}
-		if !ok || score(m) < score(f) {
-			out = append(out, m)
-		}
-	}
-	return out
-}
-
-// ---------- agents ----------
-
-type Agent struct {
-	Key, Name, Binary, SkillsDir string
-	// available reports whether a model id is in the agent's catalog (best effort).
-	available func(id string) bool
-}
-
-func home() string { h, _ := os.UserHomeDir(); return h }
-
-var agents = []Agent{
-	{
-		Key: "muse", Name: "Muse Code", Binary: "muse",
-		SkillsDir: filepath.Join(home(), ".config", "muse", "skills"),
-		available: func(id string) bool {
-			if _, err := exec.LookPath("muse"); err != nil {
-				return true // can't check without muse; assume yes
-			}
-			return exec.Command("muse", "model-profile", "show", id).Run() == nil
-		},
-	},
-}
-
-func findAgent(key string) (Agent, error) {
-	for _, a := range agents {
-		if a.Key == key {
-			return a, nil
-		}
-	}
-	return Agent{}, fmt.Errorf("unknown agent %q (supported: muse)", key)
-}
-
-// ---------- config ----------
 
 type Config struct {
-	Version   int      `json:"version"`
-	Agent     string   `json:"agent"`
-	Frontier  string   `json:"frontier"`
-	Small     string   `json:"small"`     // model id, or "auto"
-	Fallbacks []string `json:"fallbacks"` // small models to try in order if one is unavailable
-	Home      string   `json:"home"`
+	Version int    `json:"version"`
+	Agent   string `json:"agent"`
+	Worker  string `json:"worker"` // default worker alias suggested by /hstack-activate
+	Home    string `json:"home"`
 }
 
+func home() string       { h, _ := os.UserHomeDir(); return h }
 func hstackHome() string { return filepath.Join(home(), ".config", "hstack") }
 func configPath() string { return filepath.Join(hstackHome(), "config.json") }
-
-func readConfig() (*Config, error) {
-	b, err := os.ReadFile(configPath())
-	if err != nil {
-		return nil, err
+func claudeHome() string {
+	if d := os.Getenv("CLAUDE_CONFIG_DIR"); d != "" {
+		return d
 	}
-	var c Config
-	return &c, json.Unmarshal(b, &c)
-}
-
-// ---------- prompts ----------
-
-var in = bufio.NewReader(os.Stdin)
-
-func choose(title string, options []string, def int) int {
-	fmt.Println()
-	fmt.Println(bold(title))
-	for i, o := range options {
-		marker := "  "
-		if i == def {
-			marker = "› "
-		}
-		fmt.Printf("  %s%d) %s\n", marker, i+1, o)
-	}
-	for {
-		fmt.Printf("  choose [%d]: ", def+1)
-		line, err := in.ReadString('\n')
-		line = strings.TrimSpace(line)
-		if line == "" || errors.Is(err, os.ErrClosed) {
-			return def
-		}
-		var n int
-		if _, e := fmt.Sscanf(line, "%d", &n); e == nil && n >= 1 && n <= len(options) {
-			return n - 1
-		}
-		if err != nil {
-			return def
-		}
-		fmt.Println("  enter a number from the list")
-	}
+	return filepath.Join(home(), ".claude")
 }
 
 func bold(s string) string { return "\033[1m" + s + "\033[0m" }
 func dim(s string) string  { return "\033[2m" + s + "\033[0m" }
 
-func describe(m Model) string {
-	s := m.Name + "  " + dim(m.ID)
-	if m.Composite != nil {
-		s += fmt.Sprintf("  · score %.0f", *m.Composite)
+func loadModels() (*ModelList, error) {
+	b, err := hstack.Assets.ReadFile("models/claude.json")
+	if err != nil {
+		return nil, err
 	}
-	if m.CostTask != nil {
-		s += fmt.Sprintf(" · $%.2f/task", *m.CostTask)
-	}
-	return s
+	var m ModelList
+	return &m, json.Unmarshal(b, &m)
 }
 
-// ---------- install ----------
-
-func install(a Agent) error {
-	dst := hstackHome()
-	if err := os.MkdirAll(dst, 0o755); err != nil {
-		return err
+// resolve matches a loose name ("Haiku 5.5", "claude-haiku-5-5", "haiku") to a model.
+func (l *ModelList) resolve(s string) (Model, bool) {
+	norm := func(x string) string {
+		x = strings.ToLower(strings.TrimSpace(x))
+		x = strings.ReplaceAll(x, "claude", "")
+		return strings.NewReplacer(" ", "", "-", "", "_", "", ".", "").Replace(x)
 	}
-	// Extract skills, scripts and models (overwrite; this is hstack's own folder).
+	want := norm(s)
+	if want == "" {
+		return Model{}, false
+	}
+	for _, m := range l.Models {
+		cands := append([]string{m.ID, m.Alias, m.Name}, m.Names...)
+		for _, c := range cands {
+			if norm(c) == want {
+				return m, true
+			}
+		}
+	}
+	return Model{}, false
+}
+
+var in = bufio.NewReader(os.Stdin)
+
+func ask(prompt, def string) string {
+	fmt.Printf("%s [%s]: ", prompt, def)
+	line, err := in.ReadString('\n')
+	line = strings.TrimSpace(line)
+	if line == "" || err != nil {
+		return def
+	}
+	return line
+}
+
+// install extracts the embedded files into ~/.config/hstack and links skills and agents into Claude Code.
+func install() error {
+	dst := hstackHome()
 	err := fs.WalkDir(hstack.Assets, ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -231,150 +120,86 @@ func install(a Agent) error {
 		if err != nil {
 			return err
 		}
-		mode := fs.FileMode(0o644)
-		if strings.HasSuffix(p, ".sh") {
-			mode = 0o755
-		}
-		return os.WriteFile(target, b, mode)
+		return os.WriteFile(target, b, 0o644)
 	})
 	if err != nil {
 		return err
 	}
-	// Link each skill into the agent's skills folder (skills find scripts two levels up from their real path).
-	if err := os.MkdirAll(a.SkillsDir, 0o755); err != nil {
-		return err
-	}
-	entries, _ := os.ReadDir(filepath.Join(dst, "skills"))
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		link := filepath.Join(a.SkillsDir, e.Name())
-		if fi, err := os.Lstat(link); err == nil {
+	link := func(src, dest string) error {
+		if fi, err := os.Lstat(dest); err == nil {
 			if fi.Mode()&os.ModeSymlink == 0 {
-				fmt.Printf("  skip %s: %s exists and is not an hstack link\n", e.Name(), link)
-				continue
+				fmt.Printf("  skip %s: exists and is not an hstack link\n", dest)
+				return nil
 			}
-			_ = os.Remove(link)
+			_ = os.Remove(dest)
 		}
-		if err := os.Symlink(filepath.Join(dst, "skills", e.Name()), link); err != nil {
+		if err := os.Symlink(src, dest); err != nil {
 			return err
 		}
-		fmt.Printf("  %s %s\n", dim("linked"), link)
+		fmt.Printf("  %s %s\n", dim("linked"), dest)
+		return nil
+	}
+	for _, sub := range []string{"skills", "agents"} {
+		if err := os.MkdirAll(filepath.Join(claudeHome(), sub), 0o755); err != nil {
+			return err
+		}
+		entries, _ := os.ReadDir(filepath.Join(dst, sub))
+		for _, e := range entries {
+			if err := link(filepath.Join(dst, sub, e.Name()), filepath.Join(claudeHome(), sub, e.Name())); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
 
-// ---------- commands ----------
-
 func cmdInit(args []string) error {
 	fl := flag.NewFlagSet("init", flag.ExitOnError)
-	agentKey := fl.String("agent", "", "agent: muse")
-	frontier := fl.String("frontier", "", "frontier model id (the model you run sessions with)")
-	small := fl.String("small", "", "small model id, or auto")
+	worker := fl.String("worker", "", "default worker model (e.g. haiku)")
 	yes := fl.Bool("yes", false, "accept defaults without prompting")
 	_ = fl.Parse(args)
 
 	fmt.Println(bold("hstack setup") + dim("  small models do the work, frontier models direct it"))
-
-	// 1. Agent
-	if *agentKey == "" {
-		names := []string{}
-		for _, a := range agents {
-			names = append(names, a.Name)
-		}
-		names = append(names, dim("Claude Code, Cursor, OpenCode (coming later)"))
-		i := 0
-		if !*yes {
-			for {
-				i = choose("Which agent do you use?", names, 0)
-				if i < len(agents) {
-					break
-				}
-				fmt.Println("  not supported yet, pick Muse Code for now")
-			}
-		}
-		*agentKey = agents[i].Key
+	fmt.Println("Agent: Claude Code " + dim("(other agents later)"))
+	if _, err := exec.LookPath("claude"); err != nil {
+		fmt.Println("  note: `claude` is not on your PATH; installing anyway.")
 	}
-	a, err := findAgent(*agentKey)
-	if err != nil {
-		return err
-	}
-	if _, err := exec.LookPath(a.Binary); err != nil {
-		fmt.Printf("\n  note: `%s` is not on your PATH; skills will be installed anyway.\n", a.Binary)
-	}
-	r, err := loadRankings(a.Key)
+	ml, err := loadModels()
 	if err != nil {
 		return err
 	}
 
-	// 2. Frontier: only models this account can use.
-	var avail []Model
-	for _, m := range r.ranked() {
-		if a.available(m.ID) {
-			avail = append(avail, m)
+	// Default worker: the frontier is picked per session (the model you run), and
+	// /hstack-activate validates the worker against it. Here we only record a suggestion.
+	def := ml.Models[len(ml.Models)-1].Alias
+	for {
+		if *worker == "" && !*yes {
+			*worker = ask("\nDefault worker model, suggested by /hstack-activate (e.g. haiku, sonnet)", def)
+		} else if *worker == "" {
+			*worker = def
 		}
-	}
-	if len(avail) == 0 {
-		return errors.New("no models from the rankings are available on this account")
-	}
-	if *frontier == "" {
-		opts := []string{}
-		for _, m := range avail {
-			opts = append(opts, describe(m))
+		m, ok := ml.resolve(*worker)
+		if ok && m.Alias != ml.Models[0].Alias {
+			*worker = m.Alias
+			break
 		}
-		i := 0
-		if !*yes {
-			i = choose("Frontier model: the model you run sessions with (it directs)", opts, 0)
-		}
-		*frontier = avail[i].ID
-	}
-
-	// 3. Small model: must rank below the frontier.
-	var smalls []Model
-	for _, m := range r.below(*frontier) {
-		if a.available(m.ID) {
-			smalls = append(smalls, m)
-		}
-	}
-	if len(smalls) == 0 {
-		fmt.Printf("\n  %s is the lowest-ranked model available, so there is nothing smaller to delegate to.\n", *frontier)
-		fmt.Println("  hstack will install, but /hstack-activate stays inactive in sessions on this model.")
-		*small = ""
-	} else if *small == "" {
-		opts := []string{"auto " + dim("(recommended: the best-ranked model below your frontier, with fallbacks)")}
-		for _, m := range smalls {
-			opts = append(opts, describe(m))
-		}
-		i := 0
-		if !*yes {
-			i = choose("Small model: does the engineering (spec, plan, tests, code)", opts, 0)
-		}
-		if i == 0 {
-			*small = "auto"
+		if ok {
+			fmt.Printf("  %s is the most capable model, so it can't be a worker. Pick a smaller one.\n", m.Name)
 		} else {
-			*small = smalls[i-1].ID
+			fmt.Printf("  I don't know %q. Options: %s\n", *worker, aliases(ml.Models[1:]))
 		}
-	}
-
-	// Fallbacks: every valid small model, chosen one first.
-	fallbacks := []string{}
-	for _, m := range smalls {
-		if m.ID != *small {
-			fallbacks = append(fallbacks, m.ID)
+		if *yes {
+			return fmt.Errorf("invalid --worker %q", *worker)
 		}
+		*worker = ""
 	}
-	if *small != "" && *small != "auto" {
-		fallbacks = append([]string{*small}, fallbacks...)
-	}
-
-	cfg := Config{Version: 1, Agent: a.Key, Frontier: *frontier, Small: *small, Fallbacks: fallbacks, Home: hstackHome()}
 
 	fmt.Println()
 	fmt.Println(bold("Installing"))
-	if err := install(a); err != nil {
+	if err := install(); err != nil {
 		return err
 	}
+	cfg := Config{Version: 2, Agent: "claude", Worker: *worker, Home: hstackHome()}
 	b, _ := json.MarshalIndent(cfg, "", "  ")
 	if err := os.WriteFile(configPath(), append(b, '\n'), 0o644); err != nil {
 		return err
@@ -383,78 +208,59 @@ func cmdInit(args []string) error {
 
 	fmt.Println()
 	fmt.Println(bold("Done.") + " Next:")
-	fmt.Printf("  1. Start %s on your frontier model:  %s --model %s\n", a.Name, a.Binary, cfg.Frontier)
-	fmt.Println("  2. In the session, run:  /hstack-activate")
-	fmt.Println("  3. Give it a task. It writes a short intake and lets the small model do the work.")
+	fmt.Println("  1. Start Claude Code on your frontier model, e.g.  claude --model opus")
+	fmt.Println("  2. Run  /hstack-activate  and name the worker (it suggests " + *worker + ")")
+	fmt.Println("  3. Give it a real task. Use  /hstack-swarm  for parallel workers.")
 	return nil
 }
 
-func cmdModels(args []string) error {
-	agentKey := "muse"
-	if len(args) > 0 {
-		agentKey = args[0]
+func aliases(ms []Model) string {
+	var out []string
+	for _, m := range ms {
+		out = append(out, m.Alias)
 	}
-	r, err := loadRankings(agentKey)
+	return strings.Join(out, ", ")
+}
+
+func cmdModels() error {
+	ml, err := loadModels()
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s  (%s, updated %s)\n\n", bold("Model rankings"), agentKey, r.Updated)
-	fmt.Printf("  %-28s %6s %8s %8s %8s %10s\n", "model", "score", "FrontC", "TermB", "SWEAt", "cost/task")
-	f := func(p *float64, prefix string) string {
-		if p == nil {
-			return "–"
+	fmt.Printf("%s  (updated %s)\n", bold("Claude models, most to least capable"), ml.Updated)
+	for i, m := range ml.Models {
+		note := ""
+		if m.Note != "" {
+			note = "  " + dim(m.Note)
 		}
-		return fmt.Sprintf("%s%.0f", prefix, *p)
+		fmt.Printf("  %d. %-18s %-8s %s%s\n", i+1, m.Name, m.Alias, dim(m.ID), note)
 	}
-	for _, m := range r.Models {
-		cost := "–"
-		if m.CostTask != nil {
-			cost = fmt.Sprintf("$%.2f", *m.CostTask)
-		}
-		fmt.Printf("  %-28s %6s %8s %8s %8s %10s\n", m.Name, f(m.Composite, ""), f(m.Frontier, ""), f(m.Terminal, ""), f(m.SWEAtlas, ""), cost)
-	}
-	fmt.Println()
-	fmt.Println(bold("Benchmarks"))
-	for _, b := range r.Benchmarks {
-		fmt.Printf("  %-22s %s\n", b.Name, b.Tests)
-	}
-	fmt.Println()
-	fmt.Println(bold("Credit") + "  " + r.Source.Name)
-	if r.Source.URL != "" {
-		fmt.Println("  " + r.Source.URL)
-	}
-	fmt.Println("  " + dim(r.Source.Note))
+	fmt.Println("\n" + dim(ml.OrderNote))
 	return nil
 }
 
 func cmdStatus() error {
-	c, err := readConfig()
+	b, err := os.ReadFile(configPath())
 	if err != nil {
 		fmt.Println("hstack is not set up yet. Run: hstack")
 		return nil
 	}
-	b, _ := json.MarshalIndent(c, "", "  ")
-	fmt.Println(string(b))
+	fmt.Print(string(b))
 	return nil
 }
 
 func cmdUninstall() error {
-	c, err := readConfig()
-	if err == nil {
-		if a, err := findAgent(c.Agent); err == nil {
-			entries, _ := os.ReadDir(filepath.Join(hstackHome(), "skills"))
-			for _, e := range entries {
-				link := filepath.Join(a.SkillsDir, e.Name())
-				if fi, err := os.Lstat(link); err == nil && fi.Mode()&os.ModeSymlink != 0 {
-					_ = os.Remove(link)
-					fmt.Println("  removed", link)
-				}
+	for _, sub := range []string{"skills", "agents"} {
+		entries, _ := os.ReadDir(filepath.Join(hstackHome(), sub))
+		for _, e := range entries {
+			p := filepath.Join(claudeHome(), sub, e.Name())
+			if fi, err := os.Lstat(p); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+				_ = os.Remove(p)
+				fmt.Println("  removed", p)
 			}
 		}
 	}
-	fmt.Printf("Remove %s too? [y/N]: ", hstackHome())
-	line, _ := in.ReadString('\n')
-	if strings.EqualFold(strings.TrimSpace(line), "y") {
+	if strings.EqualFold(ask("Remove "+hstackHome()+" too? (y/N)", "N"), "y") {
 		if err := os.RemoveAll(hstackHome()); err != nil {
 			return err
 		}
@@ -476,7 +282,7 @@ func main() {
 	case "init":
 		err = cmdInit(args)
 	case "models":
-		err = cmdModels(args)
+		err = cmdModels()
 	case "status":
 		err = cmdStatus()
 	case "uninstall":

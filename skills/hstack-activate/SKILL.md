@@ -1,29 +1,22 @@
 ---
 name: hstack-activate
-description: Turn on hstack for this session. You (the model running this session) become the senior engineer, and a smaller model chosen at install time does the engineering. Use when the user runs /hstack-activate or asks to activate hstack.
+description: Turn on hstack for this Claude Code session. The current (frontier) model becomes the senior engineer and asks which smaller model should do the work, repeating until a valid one is given. Use when the user runs /hstack-activate or asks to activate hstack.
 ---
 
 # /hstack-activate
 
-1. **Read the setup:** `~/.config/hstack/config.json` (written by the `hstack` installer). It names the agent, the `frontier` model, the `small` model (a model id or `auto`), the `fallbacks` and the hstack `home`. If the file is missing, tell the user to run `hstack` (the installer) and stop.
+1. **Know the frontier.** It's the model running this session; your system prompt names it. Find it in `<home>/models/claude.json`, where `<home>` is `~/.config/hstack` (installed by `hstack`) or this repo. Models are listed from most to least capable.
 
-2. **Know which model you are.** Your system prompt names the model you run as. Find yourself and the small model in `<home>/models/<agent>.json`. That file holds the rankings, sorted by `composite` score.
+2. **Smallest model already?** If the session's model is the last in the list, there's nothing smaller to delegate to. Reply in one line, "hstack inactive: <model> is already the smallest, so I'll work normally.", and stop.
 
-3. **Decide whether hstack makes sense.** Stay **inactive** and work normally if any of these is true:
-   - you are not ranked higher than every small model available (there is nothing smaller to delegate to)
-   - `small` is empty
+3. **Ask for the worker.** Ask exactly: "Which smaller model should do the work? (e.g. haiku, sonnet)". If `~/.config/hstack/config.json` has a `worker`, suggest it as the default.
 
-   In that case reply in one line: "hstack inactive: <your model> is not above <small model>, so delegating would not save anything. Working normally." Stop here.
+4. **Validate, and keep asking until it's valid.**
+   - Match the answer loosely against each model's `alias`, `name` and `names`. Ignore case, spaces and the word "claude", so "Haiku 5.5", "haiku" and "claude-haiku-5-5" all match Haiku.
+   - **Unknown name:** reply "I don't know that model. Options: <aliases of models below the frontier>", then ask again.
+   - **Not smaller than the frontier:** reply "<model> isn't smaller than <frontier>, pick one of: <aliases below>", then ask again.
+   - Repeat until it's valid. Don't guess for the user.
 
-4. **Otherwise activate.** Reply in at most 3 lines:
-   - `hstack active · you direct, <small model> builds`
-   - When `small` is `auto`, the small model is the first entry in `fallbacks`. If that model is unavailable, the scripts move to the next one automatically.
-   - Say that small tasks will still be done directly, and say what counts as small.
+5. **Confirm and remember.** Reply in one line: `hstack active · <frontier> directs, <worker> builds (/hstack-swarm for parallel workers)`. Keep the worker's `alias` for the rest of the session. That alias is the `model` value you pass to the Agent tool.
 
-5. **For the rest of this session**, follow the `hstack` skill (`<home>/skills/hstack/SKILL.md`) for any task that passes its size gate. Do small tasks yourself. Start every delegated task with:
-   ```bash
-   HSTACK=<home> SMALL_MODEL=<small or first fallback> "$HSTACK/scripts/start.sh" <repo> <orch-dir> <task> <intake.md>
-   ```
-   `start.sh` reads the model and its fallbacks from the config when `SMALL_MODEL` is not set.
-
-6. **Credit:** the model rankings come from published benchmarks (see `<home>/models/<agent>.json`, `source` and `benchmarks`). Mention that if the user asks why a model was chosen.
+6. **For every task after this**, follow the `hstack` skill (`<home>/skills/hstack/SKILL.md`) with this worker. Tasks below its size gate you do yourself.

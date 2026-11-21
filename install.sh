@@ -1,29 +1,24 @@
 #!/usr/bin/env bash
-# Install every hstack skill into an agent harness by symlinking skills/* into its skills folder.
-# Usage: ./install.sh claude|muse|<skills-dir>
-#   muse    ~/.config/muse/skills (supported)
-#   claude  ~/.claude/skills (experimental: Claude Code as the frontier is not officially supported yet;
-#           Muse Code also reads this folder)
-# Prefer the hstack CLI (`hstack init`), which also records your models in ~/.config/hstack/config.json.
+# Install hstack for Claude Code from a clone: links skills into ~/.claude/skills and
+# sub-agents into ~/.claude/agents. Prefer the hstack CLI (`hstack`), which does the same
+# and also records your default worker model in ~/.config/hstack/config.json.
+# Usage: ./install.sh [claude-config-dir]   (default: ~/.claude)
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
-case "${1:-}" in
-  claude) DEST="$HOME/.claude/skills" ;;
-  muse)   DEST="$HOME/.config/muse/skills" ;;
-  "")     echo "usage: ./install.sh claude|muse|<skills-dir>" >&2; exit 2 ;;
-  *)      DEST="$1" ;;
-esac
+BASE=${1:-$HOME/.claude}
+mkdir -p "$BASE/skills" "$BASE/agents"
 
-mkdir -p "$DEST"
-chmod +x "$HERE"/scripts/*.sh
-for skill in "$HERE"/skills/*/; do
-  name=$(basename "$skill")
-  if [ -e "$DEST/$name" ] && [ ! -L "$DEST/$name" ]; then
-    echo "skip $name: $DEST/$name exists and is not an hstack symlink" >&2
-    continue
+link() { # source dest
+  if [ -e "$2" ] && [ ! -L "$2" ]; then
+    echo "skip $(basename "$2"): $2 exists and is not an hstack link" >&2
+    return
   fi
-  ln -sfn "${skill%/}" "$DEST/$name"
-  echo "installed $name -> $DEST/$name"
-done
+  ln -sfn "$1" "$2"
+  echo "linked $2"
+}
+
+for skill in "$HERE"/skills/*/; do link "${skill%/}" "$BASE/skills/$(basename "$skill")"; done
+for agent in "$HERE"/agents/*.md; do link "$agent" "$BASE/agents/$(basename "$agent")"; done
+echo "Done. In Claude Code, on your frontier model, run /hstack-activate."
 echo "Update later with: git -C $HERE pull"

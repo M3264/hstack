@@ -1,21 +1,21 @@
 import { Face } from "./face";
 
-// A real hstack run (benchmark 1), condensed from its checkpoint files.
+// A real hstack run (benchmark 2), condensed from the session.
 const agents = [
-  { name: "Wonder", role: "frontier", color: "var(--frontier)", note: "waits for checkpoints" },
-  { name: "Spark lead", role: "small model", color: "var(--small)", note: "owns spec, plan, tests" },
-  { name: "Builders ×6", role: "sub-agents", color: "#e9895a", note: "one module each" },
-  { name: "Reviewer", role: "sub-agent", color: "#e87ba4", note: "tries to break it" },
+  { name: "Opus", role: "frontier", color: "var(--frontier)", note: "briefs and reviews" },
+  { name: "Haiku worker", role: "worker", color: "var(--small)", note: "plans, tests, builds" },
 ];
 
 type Msg = { who: "frontier" | "lead" | "system"; time: string; text: React.ReactNode };
 const thread: Msg[] = [
-  { who: "frontier", time: "0:34", text: <>Intake. Implement the six engine modules exactly as BENCH-SPEC.md says. Done when <code>tsc</code> and <code>vitest</code> pass. I&apos;ll review exact strings, diff hunks and cron weekday rules.</> },
-  { who: "lead", time: "1:14", text: <>Plan: 6 sub-agents in parallel, one module each. Tests first, one named test per spec example. Then I integrate and run an independent reviewer. Approve?</> },
-  { who: "frontier", time: "1:37", text: <>APPROVE</> },
-  { who: "system", time: "", text: <>6 builders working · 141 tests written · reviewer found 2 bugs</> },
-  { who: "lead", time: "11:12", text: <>Done. The reviewer caught a template lookup bug and a cron weekday mismatch. Both fixed, with 4 regression tests. <code>tsc</code> clean · 141/141 passing.</> },
-  { who: "frontier", time: "11:35", text: <>Ran the checks myself. APPROVE</> },
+  { who: "frontier", time: "0:20", text: <>Brief. Build the waitlist backend in BENCH-SPEC.md. Done when <code>tsc</code> and <code>vitest</code> pass. I&apos;ll review the rate limiter, CSV formula guard, cursor and signup check order.</> },
+  { who: "lead", time: "1:05", text: <>Plan in PLAN.md: SQLite store, pure handlers, tests first for every spec example and error code. ASK: approve</> },
+  { who: "frontier", time: "1:12", text: <>APPROVE: build it</> },
+  { who: "system", time: "", text: <>Haiku working · 199 tests written</> },
+  { who: "lead", time: "5:40", text: <>Done. <code>tsc</code> clean · 199/199 passing.</> },
+  { who: "frontier", time: "6:10", text: <>Ran the checks. One bug: re-signup with a pending email replaces the unsubscribe token, so the first email&apos;s link breaks. Keep the token; add a regression test.</> },
+  { who: "lead", time: "7:20", text: <>Fixed, with a regression test. All tests pass.</> },
+  { who: "frontier", time: "7:50", text: <>APPROVE</> },
 ];
 
 export function ProductWindow() {
@@ -29,7 +29,7 @@ export function ProductWindow() {
             <span className="h-3 w-3 rounded-full bg-[#febc2e]" />
             <span className="h-3 w-3 rounded-full bg-[#28c840]" />
           </div>
-          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-2">
+          <ul className="grid grid-cols-2 gap-2">
             {agents.map((a, i) => (
               <li key={a.name} className={`flex flex-col items-center gap-2 rounded-2xl p-3 text-center ${i === 0 ? "bg-surface-2" : ""}`}>
                 <Face size={52} color={a.color} />
@@ -41,9 +41,9 @@ export function ProductWindow() {
             ))}
           </ul>
           <div className="mt-5 rounded-2xl border border-line p-3 font-mono text-xs leading-relaxed text-ink-2">
-            <div className="flex justify-between"><span>frontier wrote</span><span className="text-ink">9k tokens</span></div>
-            <div className="flex justify-between"><span>small model wrote</span><span className="text-ink">168k tokens</span></div>
-            <div className="mt-1 flex justify-between border-t border-line pt-1"><span>cost</span><span className="text-ink">$1.59 <span className="text-ink-3">vs $2.46</span></span></div>
+            <div className="flex justify-between"><span>frontier wrote</span><span className="text-ink">4k tokens</span></div>
+            <div className="flex justify-between"><span>worker wrote</span><span className="text-ink">106k tokens</span></div>
+            <div className="mt-1 flex justify-between border-t border-line pt-1"><span>cost</span><span className="text-ink">$0.75 <span className="text-ink-3">vs $1.59</span></span></div>
           </div>
         </aside>
 
@@ -52,9 +52,9 @@ export function ProductWindow() {
           <div className="mb-5 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 rounded-full bg-surface-2 px-3 py-1.5 text-sm">
               <Face size={18} color="var(--small)" />
-              six engine modules
+              waitlist backend
             </div>
-            <span className="rounded-full border border-line px-3 py-1.5 font-mono text-xs text-ink-2">82/82 hidden tests</span>
+            <span className="rounded-full border border-line px-3 py-1.5 font-mono text-xs text-ink-2">20/20 hidden tests</span>
           </div>
           <ol className="flex flex-col gap-3">
             {thread.map((m, i) => (
@@ -70,7 +70,7 @@ export function ProductWindow() {
                     <Face size={26} color={m.who === "frontier" ? "var(--frontier)" : "var(--small)"} className="shrink-0" />
                     <div className={`rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed [&_code]:font-mono [&_code]:text-[13px] ${m.who === "frontier" ? "bg-frontier/15 text-ink" : "bg-surface-2 text-ink"}`}>
                       <div className="mb-0.5 font-mono text-[11px] text-ink-3">
-                        {m.who === "frontier" ? "Wonder · frontier" : "Spark lead"} · {m.time}
+                        {m.who === "frontier" ? "Opus · frontier" : "Haiku worker"} · {m.time}
                       </div>
                       {m.text}
                     </div>

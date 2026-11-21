@@ -1,0 +1,49 @@
+{
+ "solo": {
+  "models": {
+   "claude-haiku-5-5": {
+    "input": 1263,
+    "cache_write": 0,
+    "cache_read": 0,
+    "output": 23,
+    "cost": 0.0001
+   },
+   "claude-opus-5-5": {
+    "input": 38,
+    "cache_write": 67962,
+    "cache_read": 1240348,
+    "output": 39806,
+    "cost": 1.588
+   }
+  },
+  "cost": 1.5882,
+  "turns": 21,
+  "duration_s": 327,
+  "acceptance": "20/20 passed, tsc ok",
+  "wall_s": 330
+ },
+ "hstack": {
+  "models": {
+   "claude-haiku-5-5": {
+    "input": 1876,
+    "cache_write": 156631,
+    "cache_read": 2562800,
+    "output": 106081,
+    "cost": 0.2957
+   },
+   "claude-opus-5-5": {
+    "input": 22,
+    "cache_write": 33864,
+    "cache_read": 531709,
+    "output": 4047,
+    "cost": 0.4583
+   }
+  },
+  "cost": 0.754,
+  "turns": 2,
+  "duration_s": 10,
+  "acceptance": "20/20 passed, tsc ok",
+  "wall_s": 473
+ },
+ "hstack_vs_solo": "-53%"
+}

@@ -1,0 +1,18 @@
+{
+  "agent": "claude",
+  "updated": "2026-11-21",
+  "order_note": "Models from most to least capable. A worker must come after the session's model in this list. Benchmark scores are added when published results are collected; until then the order is by model tier.",
+  "models": [
+    { "id": "claude-fable-5-2", "alias": "fable", "name": "Claude Fable 5.2", "names": ["fable", "fable 5.2", "claude fable"], "scores": null, "note": "Tier position assumed; confirm and add scores." },
+    { "id": "claude-opus-5-5", "alias": "opus", "name": "Claude Opus 5.5", "names": ["opus", "opus 5.5", "claude opus"], "scores": null },
+    { "id": "claude-sonnet-5-5", "alias": "sonnet", "name": "Claude Sonnet 5.5", "names": ["sonnet", "sonnet 5.5", "claude sonnet"], "scores": null },
+    { "id": "claude-haiku-5-5", "alias": "haiku", "name": "Claude Haiku 5.5", "names": ["haiku", "haiku 5.5", "claude haiku"], "scores": null }
+  ],
+  "benchmarks": [
+    { "name": "SWE-bench Pro", "tests": "Solving real-world software engineering issues" },
+    { "name": "SWE-bench Verified", "tests": "Fixing real GitHub issues with tests" },
+    { "name": "Terminal-Bench", "tests": "Executing multi-step terminal tasks" },
+    { "name": "FrontierCode", "tests": "Completing complex repository-level coding tasks" }
+  ],
+  "source": { "name": "", "url": "", "note": "Scores will be taken from the benchmark maintainers' published results and credited here." }
+}

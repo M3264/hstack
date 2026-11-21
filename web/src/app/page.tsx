@@ -6,16 +6,16 @@ import { ProductWindow } from "@/components/product-window";
 import { BENCHMARK, GITHUB, HISTORY, INSTALL_CMD, INSTALL_FROM_SOURCE } from "@/lib/site";
 
 const steps = [
-  { who: "Frontier", color: "text-frontier", title: "Writes the intake", body: "About 20 lines: why, acceptance criteria, constraints, and the risks it will check. No spec, no code." },
-  { who: "Small model", color: "text-small", title: "Does the engineering", body: "Writes the spec, plan and tests, builds alone or with 1 to N sub-agents, and runs an independent reviewer that tries to break it." },
-  { who: "Frontier", color: "text-frontier", title: "Approves at checkpoints", body: "Wakes only when the plan or the result is ready, and answers APPROVE or a few lines of REVISE. Waiting costs nothing." },
+  { who: "Frontier", color: "text-frontier", title: "Writes the brief", body: "About 15 lines: why, acceptance criteria, constraints, the risks it will check, and the done commands. No code." },
+  { who: "Small model", color: "text-small", title: "Does the engineering", body: "A worker sub-agent on a smaller model plans, writes tests first, builds, and reports. /hstack-swarm splits the work across parallel workers and a reviewer." },
+  { who: "Frontier", color: "text-frontier", title: "Reviews and directs", body: "Approves the plan, runs the checks itself, spot-checks its risks, and sends at most one short correction. It never writes the code." },
 ];
 
 const skills = [
-  { name: "hstack", for: "frontier", body: "The senior engineer: intake, plan review, terse directives, final review, token discipline." },
-  { name: "hstack-lead", for: "small model", body: "Owns the task end to end: spec, plan, fan-out, tests-first build, independent review, checkpoints." },
-  { name: "hstack-practice", for: "small model", body: "Engineering habits small models lack: exact specs, state tables, real-environment facts, security, honest reports." },
-  { name: "hstack-activate", for: "frontier", body: "Turns hstack on for the session, or stays off when your model is already the smallest one." },
+  { name: "hstack-activate", for: "frontier", body: "Turns hstack on and keeps asking for a worker model until you name a valid, smaller one. Loose names like \"haiku 5.5\" work." },
+  { name: "hstack", for: "frontier", body: "The senior engineer: size gate, brief, plan review, build review, one correction round, token discipline." },
+  { name: "hstack-swarm", for: "frontier", body: "Parallel workers on independent parts, then an independent reviewer that tries to break the result." },
+  { name: "hstack-practice", for: "worker", body: "Engineering habits small models lack: exact specs, state tables, tests first, real-environment facts, security, honest reports." },
 ];
 
 export default function Home() {
@@ -28,7 +28,7 @@ export default function Home() {
           <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(ellipse_at_top,rgba(57,135,229,0.14),transparent_60%)]" />
           <div className="relative mx-auto flex max-w-4xl flex-col items-center text-center">
             <a href={BENCHMARK} target="_blank" rel="noreferrer" className="fade-up inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-line bg-surface px-4 py-2 text-[13px] text-ink-2 transition-colors hover:text-ink sm:text-sm">
-              <span className="font-semibold text-ink"><span className="hidden sm:inline">Benchmark 1 is out: </span>35% cheaper</span><span>, same quality</span>
+              <span className="font-semibold text-ink"><span className="hidden sm:inline">Now in Claude Code: </span>53% cheaper</span><span>, same quality</span>
               <span className="grid h-6 w-6 place-items-center rounded-full bg-surface-2 text-xs" aria-hidden>↗</span>
             </a>
             <h1 className="fade-up mt-8 flex flex-wrap items-center justify-center gap-x-[0.25em] text-[clamp(48px,9vw,104px)] font-semibold leading-none tracking-[-0.045em]" style={{ animationDelay: "0.08s" }}>
@@ -81,17 +81,17 @@ export default function Home() {
         {/* Benchmark */}
         <section id="benchmark" className="gutter scroll-mt-20 py-20">
           <div className="mx-auto max-w-6xl">
-            <p className="font-mono text-xs uppercase tracking-[0.12em] text-ink-3">Benchmark 1 · six engine modules</p>
+            <p className="font-mono text-xs uppercase tracking-[0.12em] text-ink-3">Benchmark 2 · production waitlist backend</p>
             <h2 className="mt-3 max-w-3xl text-[clamp(30px,4.5vw,52px)] font-semibold leading-tight tracking-[-0.03em]">
-              Same task, same hidden tests. A third less spend.
+              Same task, same hidden tests. Half the spend.
             </h2>
             <p className="mt-4 max-w-2xl leading-relaxed text-ink-2">
-              The small model wrote 95% of the output for 10 cents. Exact token counts, including every sub-agent, and a hidden 82-test suite neither side saw.
+              Claude Opus 5.5 directed a Claude Haiku 5.5 worker and wrote 90% fewer output tokens. Exact per-model costs, including the sub-agent, and a hidden 20-test suite neither side saw.
             </p>
             <div className="mt-10"><CostMeters /></div>
             <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink-2">
               <a href={BENCHMARK} target="_blank" rel="noreferrer" className="underline decoration-line underline-offset-4 hover:text-ink">Full results and raw numbers ↗</a>
-              <a href={HISTORY} target="_blank" rel="noreferrer" className="underline decoration-line underline-offset-4 hover:text-ink">How we got from +68% to −35% ↗</a>
+              <a href={HISTORY} target="_blank" rel="noreferrer" className="underline decoration-line underline-offset-4 hover:text-ink">How we got from +68% to −53% ↗</a>
             </div>
           </div>
         </section>
@@ -117,7 +117,7 @@ export default function Home() {
                 <h3 className="text-lg font-semibold">Skill bank <span className="ml-2 rounded-full bg-surface-2 px-2.5 py-1 font-mono text-xs font-normal text-ink-2">coming next</span></h3>
               </div>
               <p className="mt-2 max-w-3xl leading-relaxed text-ink-2">
-                Curated skills that make the small model better on its own: testing, security, frameworks, data and UI quality. The more it knows, the less the frontier has to correct.
+                Curated skills that make the worker better on its own: testing, security, frameworks, data and UI quality. The more it knows, the less the frontier has to correct.
               </p>
             </div>
           </div>
@@ -127,7 +127,7 @@ export default function Home() {
         <section id="install" className="gutter scroll-mt-20 py-20">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-[clamp(30px,4.5vw,52px)] font-semibold leading-tight tracking-[-0.03em]">Install in one line</h2>
-            <p className="mt-3 text-ink-2">The installer asks for your agent, your frontier model and your small model, then sets everything up. Muse Code today, more agents later.</p>
+            <p className="mt-3 text-ink-2">The installer links the skills and sub-agents into Claude Code and saves your default worker model. Claude Code today, more agents later.</p>
             <div className="mt-8 flex flex-col gap-3 text-left">
               {[{ k: "Install", cmd: INSTALL_CMD }, { k: "From source", cmd: INSTALL_FROM_SOURCE }].map(({ k, cmd }) => (
                 <div key={k} className="rounded-2xl border border-line bg-surface p-2 pl-4">
@@ -140,9 +140,9 @@ export default function Home() {
               ))}
             </div>
             <ol className="mx-auto mt-8 grid max-w-xl gap-2 text-left text-sm text-ink-2">
-              <li><span className="font-mono text-ink-3">1.</span> Run the installer and pick your models.</li>
-              <li><span className="font-mono text-ink-3">2.</span> Start your agent on the frontier model and run <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-ink">/hstack-activate</code>.</li>
-              <li><span className="font-mono text-ink-3">3.</span> Give it a real task. The small model does the work; the frontier directs.</li>
+              <li><span className="font-mono text-ink-3">1.</span> Run the installer and pick a default worker, e.g. haiku.</li>
+              <li><span className="font-mono text-ink-3">2.</span> Start Claude Code on your frontier model, e.g. <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-ink">claude --model opus</code>, and run <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-ink">/hstack-activate</code>.</li>
+              <li><span className="font-mono text-ink-3">3.</span> Give it a real task. The worker does the work; the frontier directs.</li>
             </ol>
           </div>
         </section>

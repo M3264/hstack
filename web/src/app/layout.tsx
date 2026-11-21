@@ -9,10 +9,10 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://hstack.shellhaki.dev"),
   title: "hstack · small models do the work, frontier models direct it",
   description:
-    "Agent skills where a small, cheap model writes the spec, plan, tests and code, and a frontier model directs it like a senior engineer. 35% cheaper than the frontier alone at the same quality.",
+    "Agent skills for Claude Code where a smaller, cheaper model plans, tests and builds, and the frontier model directs it like a senior engineer. 53% cheaper than the frontier alone at the same quality.",
   openGraph: {
     title: "hstack",
-    description: "Small models do the work. Frontier models direct it. 35% cheaper, same quality.",
+    description: "Small models do the work. Frontier models direct it. 53% cheaper, same quality.",
     url: "https://hstack.shellhaki.dev",
     siteName: "hstack",
     type: "website",

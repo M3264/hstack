@@ -3,7 +3,7 @@
 export const INSTALL_SCRIPT = `#!/bin/sh
 # hstack installer
 #   curl -fsSL https://hstack.shellhaki.dev/install | sh
-# Downloads the hstack CLI, then runs its setup (pick your agent, frontier and small model).
+# Downloads the hstack CLI, then runs its setup (links the Claude Code skills and sub-agents, and picks a default worker model).
 set -eu
 
 REPO="shellhaki/hstack"

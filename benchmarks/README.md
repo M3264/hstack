@@ -1,50 +1,47 @@
 # hstack benchmarks
 
-Each benchmark runs the same task two ways and measures exact tokens and cost:
+Each benchmark runs the same task two ways, in separate Claude Code sessions, and measures exact cost per model:
 
-- **solo:** the frontier model (Muse Wonder via `muse exec`) does everything.
+- **solo:** the frontier model (default `claude-opus-5-5`) does everything.
 - **hstack:**
-  1. The frontier writes a short intake.
-  2. A small-model lead (Muse Spark, `muse exec --json --trust-workspace`) writes the spec, plan, tests and code, with its own sub-agents.
-  3. The frontier answers each checkpoint in one call per event, and approves the result.
+  1. The frontier writes a brief.
+  2. One `Agent`-tool worker on a smaller model (default `haiku`) plans, builds, tests and reports.
+  3. The frontier approves the plan, reviews the result, and sends at most one correction round.
 
 The quality gate is a hidden acceptance suite that neither side sees, plus `tsc --noEmit`. Every result is published, wins and losses alike.
 
 | # | Task | Frontier alone | hstack | Hidden tests |
 |---|---|---:|---:|---|
-| [01](01-engine-modules/results.md) | Six engine modules: Markdown, cron, JSONPath, diff, templates, expressions | $2.46 | **$1.59 (-35%)** | 82/82 · 82/82 |
+| [02](02-waitlist-backend/results.md) | Production waitlist backend (Opus 5.5 directs Haiku 5.5) | $1.59 | **$0.75 (-53%)** | 20/20 · 20/20 |
+| [01](01-engine-modules/results.md) | Six engine modules, earlier Muse version of hstack | $2.46 | $1.59 (-35%) | 82/82 · 82/82 |
 
-## Run benchmark 1
+Benchmark 1 ran on the earlier Muse Code implementation, which has since been removed. Its runner is in git history at commit `3c16879`.
 
-Requirements: `muse` on your `PATH`, `node`/`npm`, `python3`. It spends real usage on your Muse account. Choose the models with `FRONTIER_MODEL` (default `muse-wonder-1.0`) and `SMALL_MODEL` (default `muse-spark-1.3-contributor`). A failed call stops the run instead of recording bad numbers.
+## Run benchmark 2
+
+Requirements: `claude` on your `PATH`, `node`/`npm` (Node 22.5+ for `node:sqlite`), `python3`. It spends real usage on your Claude account; `BUDGET` caps each run (default $30). A run that hits a usage limit stops with an error instead of recording bad numbers.
 
 ```bash
 cd ~/hstack
-benchmarks/run.sh benchmarks/01-engine-modules solo
-benchmarks/run.sh benchmarks/01-engine-modules hstack      # can run in parallel with solo
-python3 benchmarks/cost.py benchmarks/.work/01-engine-modules/results
+benchmarks/run-claude.sh benchmarks/02-waitlist-backend solo
+benchmarks/run-claude.sh benchmarks/02-waitlist-backend hstack      # can run in parallel
+python3 benchmarks/cost-claude.py benchmarks/.work/02-waitlist-backend-claude/results
 ```
 
-For the hstack run, a progress window opens showing the lead's checkpoints and files. The run also saves:
-- the full checkpoint conversation (events and directives), in `results/hstack-checkpoints/`
-- the frontier's cost per call, in `cost.py`'s output
+Options:
+- `FRONTIER_MODEL` (default `claude-opus-5-5`)
+- `WORKER_MODEL`, any Agent-tool alias (default `haiku`)
 
-## Pricing used (`cost.py`)
-
-Per 1M tokens (cached / input / output):
-- **Muse Wonder 1.0:** $0.20 / $4 / $20
-- **Muse Spark 1.3 Contributor:** $0.002 / $0.10 / $0.20
-- **Muse Spark 1.3:** $0.15 / $1.25 / $4.25
-
-Reasoning tokens are billed as output, which is conservative. Usage includes every sub-agent: `muse exec --json` reports only the top-level run, so `cost.py` reads Muse's session store.
+Costs come from Claude Code's own report (`modelUsage[].costUSD`, list prices). Every sub-agent's model is included.
 
 ## Layout
 
 ```
 benchmarks/
-  run.sh, cost.py
-  01-engine-modules/
+  run-claude.sh, cost-claude.py
+  NN-name/
     base/      starting project + BENCH-SPEC.md (the task)
     hidden/    acceptance suite, copied in only after a run
-  .work/       git-ignored runs and raw results
+    results.md, results.raw.json
+  .work/       git-ignored runs and raw outputs
 ```

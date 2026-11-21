@@ -1,6 +1,6 @@
 # How hstack got here
 
-hstack went through three designs in two days. Each one was benchmarked against a frontier model doing the same task alone, with exact token counts and a hidden acceptance suite neither side saw. This page records what each design did, what it measured, and what changed to bring the cost down.
+hstack went through four designs. Each one was benchmarked against a frontier model doing the same task alone, with exact token counts and a hidden acceptance suite neither side saw. This page records what each design did, what it measured, and what changed to bring the cost down.
 
 All costs are USD per task, computed from exact token counts:
 - **Claude Opus 5.5:** $4 per 1M input and $20 per 1M output. Cache writes cost $5 (5-minute) or $8 (1-hour), and cache reads $0.20.
@@ -13,9 +13,10 @@ All costs are USD per task, computed from exact token counts:
 |---|---|---|---|---:|---|
 | v1: frontier plans, small models build | Claude Opus 5.5 | Muse Spark 1.3 Contributor (parallel workers) | Six engine modules: **$0.98** vs $1.09 | **-10%** | 82/82 · 82/82 |
 | v2: small model also writes the briefs and reviews | Claude Opus 5.5 | Muse Spark 1.3 Contributor | Six engine modules, partial run: $0.43 so far | not measured | 82/82 |
-| **v3 (current): small model leads, frontier directs** | **Muse Wonder 1.0** | **Muse Spark 1.3 Contributor (lead + sub-agents)** | Six engine modules: **$1.59** vs $2.46 | **-35%** | 82/82 · 82/82 |
+| v3: small model leads, frontier directs | Muse Wonder 1.0 | Muse Spark 1.3 Contributor (lead + sub-agents) | Six engine modules: $1.59 vs $2.46 | -35% | 82/82 · 82/82 |
+| **v4 (current): in-harness, Claude Code** | **Claude Opus 5.5** | **Claude Haiku 5.5 (worker sub-agent)** | Waitlist backend: **$0.75** vs $1.59 | **-53%** | 20/20 · 20/20 |
 
-v1 and v2 used Claude Opus as the frontier, and v3 uses Muse Wonder. Their list prices are close, but caching differs, so compare the percentages rather than the dollar figures across designs.
+v1, v2 and v4 used Claude Opus as the frontier, and v3 used Muse Wonder. Their list prices are close, but caching differs, so compare the percentages rather than the dollar figures across designs.
 
 ---
 
@@ -50,7 +51,7 @@ v1 and v2 used Claude Opus as the frontier, and v3 uses Muse Wonder. Their list 
 
 **Benchmark (partial):** the frontier's split cost **$0.28**. Muse drafted the briefs, built all six modules and reviewed them for **$0.14** (13 runs). The merged result scored **82/82**. The solo baseline and the frontier's final confirm step weren't measured, because the Claude account hit its usage limit mid-run. That's why v2 has no headline number.
 
-## v3 (current): the small model leads, the frontier directs
+## v3: the small model leads, the frontier directs
 
 **Idea:** the small model does everything it can, and the frontier acts as a senior engineer that decides why and what and checks the how.
 1. The frontier writes an intake of about 20 lines: why, acceptance criteria, constraints, and the risks it will review.
@@ -74,6 +75,31 @@ The small-model lead fanned out to 6 parallel builders. Its own reviewer sub-age
 
 ---
 
+## v4 (current): in-harness, inside Claude Code
+
+**Idea:** run the whole loop inside one Claude Code session. The session's model is the frontier. It directs a worker sub-agent on a smaller model through the Agent tool, and continues the same worker with SendMessage, so neither side loses context.
+
+1. `/hstack-activate` asks for a worker model until a valid, smaller one is named.
+2. The frontier writes a brief of at most 15 lines.
+3. The worker (`hstack-worker`) writes a plan. The frontier sends `APPROVE` or a short `REVISE`.
+4. The worker writes tests first, builds, and returns a done report.
+5. The frontier runs the checks itself, spot-checks its risks, and sends at most one correction round.
+6. `/hstack-swarm` splits the work across parallel workers and adds an independent `hstack-reviewer`.
+
+The Muse implementation (scripts, the small-model lead skill, the Muse runner) was removed. Benchmark 1 is kept as a historical result, and its runner is in git history at commit `3c16879`.
+
+**Benchmark 2: production waitlist backend** ([details](../benchmarks/02-waitlist-backend/results.md)):
+
+| | Opus alone | hstack v4 |
+|---|---:|---:|
+| Cost | $1.59 | **$0.75**: Opus $0.46 + Haiku $0.30 |
+| Hidden tests | 20/20, tsc ok | 20/20, tsc ok |
+| Opus output tokens | 39,806 | 4,047 |
+
+**Why it is cheaper than v3:** the frontier keeps one session, so its context is read from cache at each checkpoint instead of being re-read at full price in a fresh session. This was the largest cost in v3. Opus caught one real bug in review (a re-signup replaced the unsubscribe token), and Haiku fixed it.
+
+---
+
 ## What brought the cost down
 
 In the order they were introduced:
@@ -87,21 +113,17 @@ In the order they were introduced:
 7. **The small model owns spec, plan, tests and fan-out.** The frontier keeps only intake and approvals (v3).
 8. **Event-driven waiting.** The frontier sleeps between checkpoints with no polling, so waiting costs nothing (all versions).
 9. **Honest accounting.** Sub-agent tokens are read from Muse's session store, because `muse exec --json` reports only the top-level run. This raised v3's measured cost from $1.26 to $1.59 and lowered its saving from 46% to 35%, but the numbers are now complete.
+10. **One cached frontier session (v4).** Running inside Claude Code keeps the frontier's context in cache between checkpoints. The saving went from 35% to 53%.
 
 ## Where the cost is now, and what's next
 
-In v3 the small model's share is 6% of the bill. The other 94% is the frontier, and 83% of that is **reading context**: Muse's system instructions and the skill file, re-read at the full input price on each of 4 fresh sessions. The frontier writes almost nothing.
+In v4 the frontier is 61% of the bill ($0.46 of $0.75) and the worker 39%. The frontier writes very little (4,047 output tokens). Most of its cost is reading its context at each checkpoint.
 
-**Next: a skill bank for the small model.** The more the small model knows on its own (stack conventions, testing patterns, security, framework and driver behavior), the less the frontier has to correct, and the fewer checkpoints it needs. Skills are read by the cheap model at cheap-model prices.
+**Next: a skill bank for the worker.** The more the worker knows on its own (stack conventions, testing patterns, security, framework and driver behavior), the less the frontier has to correct. Skills are read at small-model prices.
 
-**Then the frontier optimizations (estimates, not measured):**
+**Then (estimates, not measured):**
+- Skip the plan checkpoint for low-risk tasks.
+- A shorter brief that points at the spec instead of restating it.
+- Parallel reviewers in swarm mode, so the review overlaps the build.
 
-| Optimization | Expected effect |
-|---|---|
-| One persistent frontier session across checkpoints, so context is re-read from cache | -$0.80 to -$1.00 |
-| Merge by script, not by the frontier | -$0.18 |
-| A lighter frontier base prompt (Muse presets) | to be measured |
-| Skip the plan checkpoint for low-risk tasks | about -$0.40 per call |
-| Parallel per-module reviewers, so the review overlaps the build | about -4 minutes of wall time |
-
-Together these could bring hstack to roughly $0.40–0.60 against $2.46, about 75–85% cheaper. Each one will be measured and published in [`benchmarks/`](../benchmarks/).
+Each one will be measured and published in [`benchmarks/`](../benchmarks/).

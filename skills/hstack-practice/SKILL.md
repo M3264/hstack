@@ -1,6 +1,6 @@
 ---
 name: hstack-practice
-description: Engineering practice for small models doing real implementation work. Covers writing precise specs (exact examples and state tables), test-first development, facts about the real environment that mocks hide, security basics, and honest reporting. Use whenever you are the hstack lead or one of its sub-agents, or whenever you implement a feature that a reviewer will check.
+description: Engineering practice for small models doing real implementation work. Covers writing precise specs (exact examples and state tables), test-first development, facts about the real environment that mocks hide, security basics, and honest reporting. Use whenever you are an hstack worker or reviewer, or whenever you implement a feature that a reviewer will check.
 ---
 
 # hstack practice

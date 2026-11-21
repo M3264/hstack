@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// Benchmark 1, exact costs. Both meters spend at the same rate; the cheaper run stops first.
-const SOLO = 2.4619, HS_F = 1.489, HS_S = 0.0994, HS = HS_F + HS_S, MAX = 2.5, GROW_MS = 6000;
+// Benchmark 2, exact costs. Both meters spend at the same rate; the cheaper run stops first.
+const SOLO = 1.5882, HS_F = 0.4583, HS_S = 0.2957, HS = HS_F + HS_S, MAX = 1.6, GROW_MS = 6000;
 const fmt = (v: number) => "$" + v.toFixed(2);
 
 export function CostMeters() {
@@ -66,24 +66,24 @@ export function CostMeters() {
         <button type="button" onClick={play} className="rounded-full border border-line px-3 py-1 font-mono text-xs text-ink-2 hover:text-ink">Replay ↻</button>
       </div>
       <div className="flex flex-col gap-6">
-        {lane("Frontier alone", "Muse Wonder 1.0", solo, d >= SOLO,
+        {lane("Frontier alone", "Claude Opus 5.5", solo, d >= SOLO,
           <div className="absolute inset-y-0 left-0 rounded-xl bg-frontier" style={{ width: `${(solo / MAX) * 100}%` }} />,
-          "task complete · 82/82 tests passed")}
-        {lane("hstack", "Wonder directs · Spark builds", hs, d >= HS,
+          "task complete · 20/20 tests passed")}
+        {lane("hstack", "Opus directs · Haiku builds", hs, d >= HS,
           <>
             <div className="absolute inset-y-0 left-0 bg-frontier" style={{ width: `${(f / MAX) * 100}%`, borderRadius: s > 0 ? "12px 0 0 12px" : "12px" }} />
             <div className="absolute inset-y-0 bg-small" style={{ left: `${(f / MAX) * 100}%`, width: s > 0 ? `${Math.max((s / MAX) * 100, 0.5)}%` : "0%", borderRadius: "0 12px 12px 0" }} />
           </>,
-          "task complete · 82/82 tests passed · small model: $0.10")}
+          "task complete · 20/20 tests passed · Haiku worker: $0.30")}
       </div>
       <div className={`mt-8 grid grid-cols-2 gap-6 transition-all duration-700 sm:pl-[196px] ${done ? "opacity-100" : "translate-y-2 opacity-0"}`}>
         <div>
-          <div className="text-5xl font-bold tracking-tighter sm:text-7xl">−35%</div>
-          <div className="mt-2 font-mono text-xs text-ink-3">cost · $1.59 vs $2.46</div>
+          <div className="text-5xl font-bold tracking-tighter sm:text-7xl">−53%</div>
+          <div className="mt-2 font-mono text-xs text-ink-3">cost · $0.75 vs $1.59</div>
         </div>
         <div>
           <div className="text-5xl font-bold tracking-tighter sm:text-7xl">100%</div>
-          <div className="mt-2 font-mono text-xs text-ink-3">quality · 82/82 hidden tests, both</div>
+          <div className="mt-2 font-mono text-xs text-ink-3">quality · 20/20 hidden tests, both</div>
         </div>
       </div>
     </div>
