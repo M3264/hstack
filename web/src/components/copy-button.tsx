@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 
 /** Copies `text`; shows "Copied" for 2s, or "Copy failed" for 3s. */
 export function CopyButton({
@@ -32,11 +33,11 @@ export function CopyButton({
   }
 
   return (
-    <button type="button" onClick={copy} aria-label={label} className={className} data-state={state}>
+    <Button type="button" onClick={copy} aria-label={label} className={className} data-state={state}>
       {state === "copied" ? "Copied ✓" : state === "failed" ? "Copy failed" : children ?? "Copy"}
       <span role="status" className="sr-only">
         {state === "copied" ? "Copied to clipboard" : state === "failed" ? "Copy failed" : ""}
       </span>
-    </button>
+    </Button>
   );
 }

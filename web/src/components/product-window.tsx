@@ -18,9 +18,10 @@ const thread: Msg[] = [
   { who: "frontier", time: "7:50", text: <>APPROVE</> },
 ];
 
-export function ProductWindow() {
+export function ProductWindow({ highlight, limit }: { highlight?: number[]; limit?: number }) {
+  const visible = thread.map((m, i) => ({ m, i })).filter(({ i }) => limit === undefined || i < limit);
   return (
-    <div className="overflow-hidden rounded-[22px] border border-line bg-surface shadow-[0_40px_120px_-40px_rgba(57,135,229,0.25)]">
+    <div className="overflow-hidden rounded-xl border border-line bg-surface ">
       <div className="grid md:grid-cols-[300px_minmax(0,1fr)]">
         {/* Agents */}
         <aside className="border-b border-line p-5 md:border-b-0 md:border-r">
@@ -54,22 +55,22 @@ export function ProductWindow() {
               <Face size={18} color="var(--small)" />
               waitlist backend
             </div>
-            <span className="rounded-full border border-line px-3 py-1.5 font-mono text-xs text-ink-2">20/20 hidden tests</span>
+            <span className="rounded-full border border-line px-3 py-1.5 text-xs text-ink-2">20/20 hidden tests</span>
           </div>
           <ol className="flex flex-col gap-3">
-            {thread.map((m, i) => (
+            {visible.map(({ m, i }) => (
               <li
                 key={i}
-                className={`fade-up flex ${m.who === "frontier" ? "justify-end" : m.who === "system" ? "justify-center" : "justify-start"}`}
+                className={`fade-up flex ${m.who === "frontier" ? "justify-end" : m.who === "system" ? "justify-center" : "justify-start"} ${highlight && !highlight.includes(i) ? "opacity-40" : ""}`}
                 style={{ animationDelay: `${0.25 + i * 0.35}s` }}
               >
                 {m.who === "system" ? (
-                  <span className="rounded-full border border-dashed border-line px-3 py-1 font-mono text-xs text-ink-3">{m.text}</span>
+                  <span className="rounded-full border border-dashed border-line px-3 py-1 text-xs text-ink-3">{m.text}</span>
                 ) : (
                   <div className={`flex max-w-[88%] items-end gap-2 ${m.who === "frontier" ? "flex-row-reverse" : ""}`}>
                     <Face size={26} color={m.who === "frontier" ? "var(--frontier)" : "var(--small)"} className="shrink-0" />
                     <div className={`rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed [&_code]:font-mono [&_code]:text-[13px] ${m.who === "frontier" ? "bg-frontier/15 text-ink" : "bg-surface-2 text-ink"}`}>
-                      <div className="mb-0.5 font-mono text-[11px] text-ink-3">
+                      <div className="mb-0.5 text-[11px] text-ink-3">
                         {m.who === "frontier" ? "Opus · frontier" : "Haiku worker"} · {m.time}
                       </div>
                       {m.text}

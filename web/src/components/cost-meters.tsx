@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 
 // Benchmark 2, exact costs. Both meters spend at the same rate; the cheaper run stops first.
 const SOLO = 1.5882, HS_F = 0.4583, HS_S = 0.2957, HS = HS_F + HS_S, MAX = 1.6, GROW_MS = 6000;
@@ -47,23 +48,23 @@ export function CostMeters() {
     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 sm:grid-cols-[180px_minmax(0,1fr)_auto]">
       <div className="min-w-0">
         <div className="text-lg font-semibold sm:text-xl">{name}</div>
-        <div className="font-mono text-xs text-ink-3">{sub}</div>
+        <div className="text-xs text-ink-3">{sub}</div>
       </div>
       <div className="order-3 col-span-2 h-12 overflow-hidden rounded-xl bg-surface-2 sm:order-none sm:col-span-1 sm:h-14">
         <div className="relative h-full">{bars}</div>
       </div>
-      <div className="text-right font-mono text-2xl font-semibold tabular-nums sm:text-4xl">{fmt(cost)}</div>
-      <div className={`order-4 col-span-2 min-h-5 font-mono text-xs sm:col-start-2 sm:col-span-2 ${finished ? "text-good" : "text-ink-3"}`}>
+      <div className="text-right text-2xl font-semibold tabular-nums sm:text-4xl">{fmt(cost)}</div>
+      <div className={`order-4 col-span-2 min-h-5 text-xs sm:col-start-2 sm:col-span-2 ${finished ? "text-good" : "text-ink-3"}`}>
         {finished ? note : ""}
       </div>
     </div>
   );
 
   return (
-    <div ref={ref} className="rounded-[22px] border border-line bg-surface p-5 sm:p-8">
+    <div ref={ref} className="rounded-xl border border-line bg-surface p-5 sm:p-8">
       <div className="mb-6 flex items-center justify-between gap-3">
-        <span className="font-mono text-xs uppercase tracking-[0.12em] text-ink-3">Cost to build the same task</span>
-        <button type="button" onClick={play} className="rounded-full border border-line px-3 py-1 font-mono text-xs text-ink-2 hover:text-ink">Replay ↻</button>
+        <span className="text-[13px] text-ink-2">Cost to build the same task</span>
+        <Button type="button" variant="outline" size="sm" onClick={play} className="shrink-0 whitespace-nowrap">Replay ↻</Button>
       </div>
       <div className="flex flex-col gap-6">
         {lane("Frontier alone", "Claude Opus 5.5", solo, d >= SOLO,
@@ -79,11 +80,11 @@ export function CostMeters() {
       <div className={`mt-8 grid grid-cols-2 gap-6 transition-all duration-700 sm:pl-[196px] ${done ? "opacity-100" : "translate-y-2 opacity-0"}`}>
         <div>
           <div className="text-5xl font-bold tracking-tighter sm:text-7xl">−53%</div>
-          <div className="mt-2 font-mono text-xs text-ink-3">cost · $0.75 vs $1.59</div>
+          <div className="mt-2 text-xs text-ink-3">cost · $0.75 vs $1.59</div>
         </div>
         <div>
           <div className="text-5xl font-bold tracking-tighter sm:text-7xl">100%</div>
-          <div className="mt-2 font-mono text-xs text-ink-3">quality · 20/20 hidden tests, both</div>
+          <div className="mt-2 text-xs text-ink-3">quality · 20/20 hidden tests, both</div>
         </div>
       </div>
     </div>

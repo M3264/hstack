@@ -1,99 +1,62 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
-import { GITHUB, INSTALL_CMD, INSTALL_FROM_SOURCE } from "@/lib/site";
+import { useEffect, useState } from "react";
+import { GITHUB, INSTALL_CMD } from "@/lib/site";
+import { CopyButton } from "./copy-button";
 
 const links = [
-  { href: "#how", label: "How it works" },
   { href: "#benchmark", label: "Benchmark" },
+  { href: "#how", label: "How it works" },
   { href: "#skills", label: "Skills" },
-  { href: GITHUB, label: "Docs" },
 ];
 
 export function Nav() {
-  const [open, setOpen] = useState(false); // install dropdown
-  const [menu, setMenu] = useState(false); // mobile menu
-  const [copied, setCopied] = useState<string | null>(null);
-  const ref = useRef<HTMLDivElement>(null);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setOpen(false); setMenu(false); } };
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
+    const onScroll = () => setScrolled(window.scrollY > 12);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const commands = { curl: INSTALL_CMD, go: INSTALL_FROM_SOURCE } as const;
-  async function copy(which: keyof typeof commands) {
-    try { await navigator.clipboard.writeText(commands[which]); setCopied(which); } catch { setCopied("failed"); }
-    setTimeout(() => { setCopied(null); setOpen(false); }, 1500);
-  }
-
   return (
-    <header className="gutter sticky top-0 z-40 border-b border-line/60 bg-bg/80 backdrop-blur" style={{ top: "env(safe-area-inset-top, 0px)" }}>
-      <nav className="mx-auto flex h-16 max-w-6xl items-center gap-6" aria-label="Main">
-        <a href="#" className="flex items-center gap-2.5 font-semibold tracking-tight" aria-label="hstack home">
-          <Image src="/logo-256.png" alt="" width={30} height={30} priority />
-          <span className="text-lg">hstack</span>
+    <header
+      className={`gutter sticky top-0 z-50 border-b bg-bg/75 backdrop-blur-xl transition-colors duration-300 ${scrolled ? "border-line" : "border-transparent"}`}
+    >
+      <nav className="mx-auto flex h-14 max-w-[1240px] items-center justify-between gap-6" aria-label="Main">
+        <a href="#" className="flex items-center gap-2 text-ink" aria-label="hstack home">
+          <Image src="/logo-256.png" alt="" width={22} height={22} priority />
+          <span className="text-base font-medium tracking-[-0.025em]">hstack</span>
         </a>
-
-        <ul className="ml-4 hidden items-center gap-7 text-[15px] text-ink-2 md:flex">
+        <div className="flex items-center gap-1 sm:gap-2">
           {links.map((l) => (
-            <li key={l.label}>
-              <a href={l.href} className="transition-colors hover:text-ink" {...(l.href.startsWith("http") ? { target: "_blank", rel: "noreferrer" } : {})}>
-                {l.label}
-              </a>
-            </li>
+            <a key={l.href} href={l.href} className="hidden px-2.5 text-[13px] text-ink-2 transition-colors hover:text-ink md:block">
+              {l.label}
+            </a>
           ))}
-        </ul>
-
-        <div className="ml-auto flex items-center gap-2.5">
-          <a href={GITHUB} target="_blank" rel="noreferrer" className="hidden h-10 items-center rounded-full bg-surface-2 px-5 text-[15px] transition-colors hover:bg-line sm:flex">
-            GitHub
+          <a href={GITHUB} target="_blank" rel="noreferrer" className="flex h-9 items-center gap-2 px-2.5 text-[13px] text-ink-2 transition-colors hover:text-ink">
+            <GitHubMark size={14} />
+            <span>GitHub</span>
           </a>
-          <div ref={ref} className="relative flex h-10 items-stretch overflow-visible">
-            <button type="button" onClick={() => copy("curl")} className="rounded-l-full bg-ink pl-5 pr-4 text-[15px] font-medium text-bg transition-opacity hover:opacity-90">
-              {copied === "curl" ? "Copied ✓" : copied === "failed" ? "Copy failed" : "Install"}
-            </button>
-            <button
-              type="button"
-              aria-label="Choose where to install"
-              aria-expanded={open}
-              aria-haspopup="menu"
-              onClick={() => setOpen((v) => !v)}
-              className="rounded-r-full border-l border-bg/15 bg-ink px-3 text-bg transition-opacity hover:opacity-90"
-            >
-              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </button>
-            {open && (
-              <div role="menu" className="absolute right-0 top-12 w-64 rounded-2xl border border-line bg-surface p-1.5 shadow-2xl">
-                {(["curl", "go"] as const).map((k) => (
-                  <button key={k} role="menuitem" type="button" onClick={() => copy(k)} className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm hover:bg-surface-2">
-                    <span>{k === "curl" ? "One-line install" : "From source (Go)"}</span>
-                    <span className="font-mono text-xs text-ink-3">{copied === k ? "copied ✓" : "copy command"}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <button type="button" className="ml-1 grid h-10 w-10 place-items-center rounded-full bg-surface-2 md:hidden" aria-label="Open menu" aria-expanded={menu} onClick={() => setMenu((v) => !v)}>
-            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden><path d="M2 5h12M2 11h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
-          </button>
+          <CopyButton
+            text={INSTALL_CMD}
+            label="Copy the install command"
+            className="h-8 rounded-lg bg-frontier px-3.5 text-[13px] font-semibold text-white transition-[background,transform] hover:-translate-y-px hover:bg-frontier-hover"
+          >
+            Install
+          </CopyButton>
         </div>
       </nav>
-      {menu && (
-        <ul className="mx-auto flex max-w-6xl flex-col gap-1 pb-4 md:hidden">
-          {links.map((l) => (
-            <li key={l.label}>
-              <a href={l.href} onClick={() => setMenu(false)} className="block rounded-xl px-3 py-2.5 text-ink-2 hover:bg-surface-2 hover:text-ink">
-                {l.label}
-              </a>
-            </li>
-          ))}
-        </ul>
-      )}
     </header>
+  );
+}
+
+export function GitHubMark({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M12 .5C5.65.5.5 5.65.5 12a11.5 11.5 0 0 0 7.86 10.93c.58.1.79-.25.79-.56v-2c-3.2.69-3.88-1.37-3.88-1.37-.52-1.33-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.75 1.18 1.02 1.75 2.68 1.25 3.34.95.1-.74.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.83 1.18 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z" />
+    </svg>
   );
 }
