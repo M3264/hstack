@@ -1,11 +1,6 @@
----
-name: hstack-practice
-description: Engineering practice for small models doing real implementation work. Covers writing precise specs (exact examples and state tables), test-first development, facts about the real environment that mocks hide, security basics, and honest reporting. Use whenever you are an hstack worker or reviewer, or whenever you implement a feature that a reviewer will check.
----
+# Engineering practice
 
-# hstack practice
-
-Small models fail in predictable ways: they fill gaps with guesses, test their own assumptions, and report success too early. This skill closes those gaps.
+Small models fail in predictable ways: they fill gaps with guesses, test their own assumptions, and report success too early. This guide closes those gaps.
 
 ## Spec: values, not intentions
 - Give every output that leaves the code **by example**: input, then exact output.

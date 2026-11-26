@@ -1,0 +1,13 @@
+{
+  "agent": "codex",
+  "updated": "2026-11-25",
+  "default_worker": "luna-5.6",
+  "order_note": "Built-in fallback, used only when Codex's local model cache is missing. The live list comes from that cache, ordered by its priority. GPT-6.2 Sol and Astra appear only when your account has them.",
+  "models": [
+    { "id": "gpt-6-luna", "alias": "luna", "name": "GPT-6-Luna", "names": ["luna", "gpt-6 luna", "luna 6"], "scores": null, "note": "Fast, narrow, lower-cost work." },
+    { "id": "gpt-5.6-terra", "alias": "terra-5.6", "name": "GPT-5.6-Terra", "names": ["terra", "terra 5.6", "gpt-5.6 terra"], "scores": null },
+    { "id": "gpt-5.6-luna", "alias": "luna-5.6", "name": "GPT-5.6-Luna", "names": ["luna 5.6", "gpt-5.6 luna"], "scores": null, "note": "Fast, narrow, lower-cost work." }
+  ],
+  "benchmarks": [],
+  "source": { "name": "Codex local model cache", "url": "", "note": "Models seen in the local cache; add published benchmark results and a source URL when collected." }
+}

@@ -1,6 +1,7 @@
 {
   "agent": "claude",
   "updated": "2026-11-21",
+  "default_worker": "haiku",
   "order_note": "Models from most to least capable. A worker must come after the session's model in this list. Benchmark scores are added when published results are collected; until then the order is by model tier.",
   "models": [
     { "id": "claude-fable-5-2", "alias": "fable", "name": "Claude Fable 5.2", "names": ["fable", "fable 5.2", "claude fable"], "scores": null, "note": "Tier position assumed; confirm and add scores." },

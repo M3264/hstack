@@ -1,0 +1,20 @@
+{
+  "agent": "muse",
+  "updated": "2026-11-22",
+  "default_worker": "ember",
+  "order_note": "Models from most to least capable, by the published composite (FrontierCode-AA 2.0, Terminal-Bench 4.1, SWE-Atlas-QnA-AA). A worker must come after the session's model in this list. A '-contributor' variant is the same model at much lower token prices, and your content, including messages between sessions, may be used for product improvement.",
+  "models": [
+    { "id": "muse-wonder-1.0", "alias": "wonder", "name": "Muse Wonder", "names": ["wonder", "muse wonder", "wonder 1.0"], "scores": null },
+    { "id": "muse-ember-1.0", "alias": "ember", "name": "Muse Ember", "names": ["ember", "muse ember", "ember 1.0"], "scores": null },
+    { "id": "muse-spark-1.3", "alias": "spark-1.3", "name": "Muse Spark 1.3", "names": ["spark", "muse spark", "spark 1.3"], "scores": null },
+    { "id": "muse-spark-1.3-contributor", "alias": "spark-1.3-contributor", "name": "Muse Spark 1.3 Contributor", "names": ["spark contributor", "spark 1.3 contributor"], "scores": null, "note": "Same model as Spark 1.3 at contributor prices; content may be used for product improvement." },
+    { "id": "muse-spark-1.2", "alias": "spark-1.2", "name": "Muse Spark 1.2", "names": ["spark 1.2", "muse spark 1.2"], "scores": null },
+    { "id": "muse-spark-1.2-contributor", "alias": "spark-1.2-contributor", "name": "Muse Spark 1.2 Contributor", "names": ["spark 1.2 contributor"], "scores": null, "note": "Same model as Spark 1.2 at contributor prices; content may be used for product improvement." }
+  ],
+  "benchmarks": [
+    { "name": "FrontierCode-AA 2.0", "tests": "Complex repository engineering" },
+    { "name": "Terminal-Bench 4.1", "tests": "Terminal and command-line execution" },
+    { "name": "SWE-Atlas-QnA-AA", "tests": "Software engineering knowledge and problem-solving" }
+  ],
+  "source": { "name": "Published benchmark results for Muse models", "url": "", "note": "Order taken from the benchmark maintainers' published composite; add the source URL and per-model scores when citing." }
+}

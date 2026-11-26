@@ -1,0 +1,11 @@
+[
+  { "name": "Linear", "url": "https://linear.app" },
+  { "name": "Vercel", "url": "https://vercel.com" },
+  { "name": "Stripe", "url": "https://stripe.com" },
+  { "name": "Raycast", "url": "https://www.raycast.com" },
+  { "name": "Resend", "url": "https://resend.com" },
+  { "name": "Figma", "url": "https://www.figma.com" },
+  { "name": "Notion", "url": "https://www.notion.com" },
+  { "name": "Supabase", "url": "https://supabase.com" },
+  { "name": "Brimble", "url": "https://www.brimble.io" }
+]

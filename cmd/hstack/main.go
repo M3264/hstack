@@ -1,9 +1,9 @@
-// Command hstack installs hstack for Claude Code: the skills (hstack, hstack-activate,
-// hstack-swarm, hstack-practice) and the worker sub-agents (hstack-worker, hstack-reviewer).
+// Command hstack installs hstack for Claude Code, Muse Code or Codex: the skills (hstack,
+// hstack-swarm, hstack-ui, hstack-motion, hstack-research) and the worker sub-agents (hstack-worker, hstack-reviewer).
 //
-//	hstack            interactive setup (same as `hstack init`)
-//	hstack init       [--worker haiku] [--yes]
-//	hstack models     show the model list used to validate workers
+//	hstack            install for Claude Code (same as `hstack install`)
+//	hstack install    [--agent claude|muse|codex]
+//	hstack models     show the model list used to validate workers (live from the harness's catalog when it has one)
 //	hstack status     show the saved setup
 //	hstack uninstall  remove the installed links and setup
 package main
@@ -33,10 +33,11 @@ type Model struct {
 }
 
 type ModelList struct {
-	Updated    string  `json:"updated"`
-	OrderNote  string  `json:"order_note"`
-	Models     []Model `json:"models"`
-	Benchmarks []struct {
+	Updated       string  `json:"updated"`
+	DefaultWorker string  `json:"default_worker"`
+	OrderNote     string  `json:"order_note"`
+	Models        []Model `json:"models"`
+	Benchmarks    []struct {
 		Name  string `json:"name"`
 		Tests string `json:"tests"`
 	} `json:"benchmarks"`
@@ -45,7 +46,6 @@ type ModelList struct {
 type Config struct {
 	Version int    `json:"version"`
 	Agent   string `json:"agent"`
-	Worker  string `json:"worker"` // default worker alias suggested by /hstack-activate
 	Home    string `json:"home"`
 }
 
@@ -62,35 +62,26 @@ func claudeHome() string {
 func bold(s string) string { return "\033[1m" + s + "\033[0m" }
 func dim(s string) string  { return "\033[2m" + s + "\033[0m" }
 
-func loadModels() (*ModelList, error) {
-	b, err := hstack.Assets.ReadFile("models/claude.json")
+// agentsHome is the shared skills root that Muse Code and Codex read (Muse also reads ~/.claude/skills).
+func agentsHome() string { return filepath.Join(home(), ".agents") }
+
+// skillTargets lists where an agent loads skills and sub-agents from.
+func skillTargets(agent string) (skills string, agents string) {
+	if agent == "muse" || agent == "codex" {
+		// Muse has no sub-agent files: its workers read <home>/agents/*.md as instructions.
+		// Codex sub-agents are TOML files written by installCodexAgents instead of links.
+		return filepath.Join(agentsHome(), "skills"), ""
+	}
+	return filepath.Join(claudeHome(), "skills"), filepath.Join(claudeHome(), "agents")
+}
+
+func loadModels(agent string) (*ModelList, error) {
+	b, err := hstack.Assets.ReadFile("models/" + agent + ".json")
 	if err != nil {
 		return nil, err
 	}
 	var m ModelList
 	return &m, json.Unmarshal(b, &m)
-}
-
-// resolve matches a loose name ("Haiku 5.5", "claude-haiku-5-5", "haiku") to a model.
-func (l *ModelList) resolve(s string) (Model, bool) {
-	norm := func(x string) string {
-		x = strings.ToLower(strings.TrimSpace(x))
-		x = strings.ReplaceAll(x, "claude", "")
-		return strings.NewReplacer(" ", "", "-", "", "_", "", ".", "").Replace(x)
-	}
-	want := norm(s)
-	if want == "" {
-		return Model{}, false
-	}
-	for _, m := range l.Models {
-		cands := append([]string{m.ID, m.Alias, m.Name}, m.Names...)
-		for _, c := range cands {
-			if norm(c) == want {
-				return m, true
-			}
-		}
-	}
-	return Model{}, false
 }
 
 var in = bufio.NewReader(os.Stdin)
@@ -105,9 +96,16 @@ func ask(prompt, def string) string {
 	return line
 }
 
-// install extracts the embedded files into ~/.config/hstack and links skills and agents into Claude Code.
-func install() error {
+// install extracts the embedded files into ~/.config/hstack and links skills (and, for Claude Code,
+// sub-agents) where the agent loads them.
+func install(agent string) error {
 	dst := hstackHome()
+	// Start from a clean copy, so skills removed from hstack don't linger.
+	for _, sub := range []string{"skills", "agents", "models"} {
+		if err := os.RemoveAll(filepath.Join(dst, sub)); err != nil {
+			return err
+		}
+	}
 	err := fs.WalkDir(hstack.Assets, ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -139,103 +137,121 @@ func install() error {
 		fmt.Printf("  %s %s\n", dim("linked"), dest)
 		return nil
 	}
-	for _, sub := range []string{"skills", "agents"} {
-		if err := os.MkdirAll(filepath.Join(claudeHome(), sub), 0o755); err != nil {
+	skillsDir, agentsDir := skillTargets(agent)
+	for sub, target := range map[string]string{"skills": skillsDir, "agents": agentsDir} {
+		if target == "" {
+			continue
+		}
+		if err := os.MkdirAll(target, 0o755); err != nil {
 			return err
+		}
+		// Drop our links whose skill or agent no longer exists.
+		old, _ := os.ReadDir(target)
+		for _, e := range old {
+			p := filepath.Join(target, e.Name())
+			if dest, err := os.Readlink(p); err == nil && strings.HasPrefix(dest, dst+string(os.PathSeparator)) {
+				if _, err := os.Stat(dest); os.IsNotExist(err) {
+					_ = os.Remove(p)
+					fmt.Printf("  %s %s\n", dim("removed"), p)
+				}
+			}
 		}
 		entries, _ := os.ReadDir(filepath.Join(dst, sub))
 		for _, e := range entries {
-			if err := link(filepath.Join(dst, sub, e.Name()), filepath.Join(claudeHome(), sub, e.Name())); err != nil {
+			if err := link(filepath.Join(dst, sub, e.Name()), filepath.Join(target, e.Name())); err != nil {
 				return err
 			}
 		}
 	}
+	if agent == "codex" {
+		return installCodexAgents()
+	}
 	return nil
 }
 
-func cmdInit(args []string) error {
-	fl := flag.NewFlagSet("init", flag.ExitOnError)
-	worker := fl.String("worker", "", "default worker model (e.g. haiku)")
-	yes := fl.Bool("yes", false, "accept defaults without prompting")
+func cmdInstall(args []string) error {
+	fl := flag.NewFlagSet("install", flag.ExitOnError)
+	agent := fl.String("agent", "claude", "harness: claude (Claude Code), muse (Muse Code) or codex (Codex)")
 	_ = fl.Parse(args)
 
-	fmt.Println(bold("hstack setup") + dim("  small models do the work, frontier models direct it"))
-	fmt.Println("Agent: Claude Code " + dim("(other agents later)"))
-	if _, err := exec.LookPath("claude"); err != nil {
-		fmt.Println("  note: `claude` is not on your PATH; installing anyway.")
+	names := map[string]string{"claude": "Claude Code", "muse": "Muse Code", "codex": "Codex"}
+	if names[*agent] == "" {
+		return fmt.Errorf("unknown --agent %q (use claude, muse or codex)", *agent)
 	}
-	ml, err := loadModels()
-	if err != nil {
+	fmt.Println(bold("hstack") + dim("  small models do the work, frontier models direct it"))
+	fmt.Println("Installing for " + names[*agent])
+	if _, err := exec.LookPath(*agent); err != nil {
+		fmt.Printf("  note: `%s` is not on your PATH; installing anyway.\n", *agent)
+	}
+	if err := install(*agent); err != nil {
 		return err
 	}
-
-	// Default worker: the frontier is picked per session (the model you run), and
-	// /hstack-activate validates the worker against it. Here we only record a suggestion.
-	def := ml.Models[len(ml.Models)-1].Alias
-	for {
-		if *worker == "" && !*yes {
-			*worker = ask("\nDefault worker model, suggested by /hstack-activate (e.g. haiku, sonnet)", def)
-		} else if *worker == "" {
-			*worker = def
-		}
-		m, ok := ml.resolve(*worker)
-		if ok && m.Alias != ml.Models[0].Alias {
-			*worker = m.Alias
-			break
-		}
-		if ok {
-			fmt.Printf("  %s is the most capable model, so it can't be a worker. Pick a smaller one.\n", m.Name)
-		} else {
-			fmt.Printf("  I don't know %q. Options: %s\n", *worker, aliases(ml.Models[1:]))
-		}
-		if *yes {
-			return fmt.Errorf("invalid --worker %q", *worker)
-		}
-		*worker = ""
-	}
-
-	fmt.Println()
-	fmt.Println(bold("Installing"))
-	if err := install(); err != nil {
-		return err
-	}
-	cfg := Config{Version: 2, Agent: "claude", Worker: *worker, Home: hstackHome()}
+	cfg := Config{Version: 3, Agent: *agent, Home: hstackHome()}
 	b, _ := json.MarshalIndent(cfg, "", "  ")
 	if err := os.WriteFile(configPath(), append(b, '\n'), 0o644); err != nil {
 		return err
 	}
-	fmt.Printf("  %s %s\n", dim("saved"), configPath())
 
 	fmt.Println()
-	fmt.Println(bold("Done.") + " Next:")
-	fmt.Println("  1. Start Claude Code on your frontier model, e.g.  claude --model opus")
-	fmt.Println("  2. Run  /hstack-activate  and name the worker (it suggests " + *worker + ")")
-	fmt.Println("  3. Give it a real task. Use  /hstack-swarm  for parallel workers.")
+	fmt.Println(bold("Done.") + " In a session on your frontier model, run  /hstack  to pick the worker.")
 	return nil
 }
 
-func aliases(ms []Model) string {
-	var out []string
-	for _, m := range ms {
-		out = append(out, m.Alias)
+func cmdModels(args []string) error {
+	fl := flag.NewFlagSet("models", flag.ContinueOnError)
+	agent := fl.String("agent", "", "harness: claude, muse or codex (default: the one saved by install)")
+	frontier := fl.String("frontier", "", "the session's model id; picks the harness by its prefix when --agent is not set")
+	asJSON := fl.Bool("json", false, "print [{id, name, alias, note, rank}], most to least capable")
+	if err := fl.Parse(args); err != nil {
+		return err
 	}
-	return strings.Join(out, ", ")
-}
-
-func cmdModels() error {
-	ml, err := loadModels()
+	a := *agent
+	if a == "" && fl.NArg() > 0 {
+		a = fl.Arg(0) // older form: hstack models codex
+	}
+	if a == "" && *frontier != "" {
+		var err error
+		if a, err = agentForModel(*frontier); err != nil {
+			return err
+		}
+	}
+	if a == "" {
+		a = "claude"
+		if b, err := os.ReadFile(configPath()); err == nil {
+			var c Config
+			if json.Unmarshal(b, &c) == nil && c.Agent != "" {
+				a = c.Agent
+			}
+		}
+	}
+	if a != "claude" && a != "muse" && a != "codex" {
+		return fmt.Errorf("unknown agent %q (use claude, muse or codex)", a)
+	}
+	list, err := modelList(a)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s  (updated %s)\n", bold("Claude models, most to least capable"), ml.Updated)
-	for i, m := range ml.Models {
+	if *asJSON {
+		fmt.Fprintln(os.Stderr, "source: "+list.Source)
+		b, err := json.MarshalIndent(list.Rows, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(b))
+		return nil
+	}
+	fmt.Println(bold(a + " models, most to least capable"))
+	fmt.Println(dim("source: " + list.Source))
+	for i, m := range list.Rows {
 		note := ""
 		if m.Note != "" {
 			note = "  " + dim(m.Note)
 		}
-		fmt.Printf("  %d. %-18s %-8s %s%s\n", i+1, m.Name, m.Alias, dim(m.ID), note)
+		fmt.Printf("  %d. %-28s %-22s %s%s\n", i+1, m.Name, m.Alias, dim(m.ID), note)
 	}
-	fmt.Println("\n" + dim(ml.OrderNote))
+	if list.OrderNote != "" {
+		fmt.Println("\n" + dim(list.OrderNote))
+	}
 	return nil
 }
 
@@ -250,16 +266,23 @@ func cmdStatus() error {
 }
 
 func cmdUninstall() error {
-	for _, sub := range []string{"skills", "agents"} {
+	targets := map[string][]string{
+		"skills": {filepath.Join(claudeHome(), "skills"), filepath.Join(agentsHome(), "skills")},
+		"agents": {filepath.Join(claudeHome(), "agents")},
+	}
+	for sub, dirs := range targets {
 		entries, _ := os.ReadDir(filepath.Join(hstackHome(), sub))
 		for _, e := range entries {
-			p := filepath.Join(claudeHome(), sub, e.Name())
-			if fi, err := os.Lstat(p); err == nil && fi.Mode()&os.ModeSymlink != 0 {
-				_ = os.Remove(p)
-				fmt.Println("  removed", p)
+			for _, dir := range dirs {
+				p := filepath.Join(dir, e.Name())
+				if fi, err := os.Lstat(p); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+					_ = os.Remove(p)
+					fmt.Println("  removed", p)
+				}
 			}
 		}
 	}
+	removeCodexAgents()
 	if strings.EqualFold(ask("Remove "+hstackHome()+" too? (y/N)", "N"), "y") {
 		if err := os.RemoveAll(hstackHome()); err != nil {
 			return err
@@ -270,19 +293,19 @@ func cmdUninstall() error {
 }
 
 func main() {
-	cmd, args := "init", []string{}
+	cmd, args := "install", []string{}
 	if len(os.Args) > 1 {
 		cmd, args = os.Args[1], os.Args[2:]
 		if strings.HasPrefix(cmd, "-") {
-			cmd, args = "init", os.Args[1:]
+			cmd, args = "install", os.Args[1:]
 		}
 	}
 	var err error
 	switch cmd {
-	case "init":
-		err = cmdInit(args)
+	case "install":
+		err = cmdInstall(args)
 	case "models":
-		err = cmdModels()
+		err = cmdModels(args)
 	case "status":
 		err = cmdStatus()
 	case "uninstall":
@@ -290,7 +313,7 @@ func main() {
 	case "version", "--version":
 		fmt.Println("hstack", version)
 	case "help", "-h", "--help":
-		fmt.Println("usage: hstack [init|models|status|uninstall|version]")
+		fmt.Println("usage: hstack [install [--agent claude|muse|codex]|models [--agent claude|muse|codex] [--frontier <model id>] [--json]|status|uninstall|version]")
 	default:
 		err = fmt.Errorf("unknown command %q (try: hstack help)", cmd)
 	}

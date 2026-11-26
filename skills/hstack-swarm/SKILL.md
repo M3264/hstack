@@ -1,11 +1,15 @@
 ---
 name: hstack-swarm
-description: Parallel mode for hstack in Claude Code. The worker plans a split, several workers on the same smaller model build independent parts in parallel, and an independent reviewer tries to break the result, while the frontier only briefs, approves and reviews. Use when the user runs /hstack-swarm (hstack must be active).
+description: Parallel hstack mode. Use for /hstack-swarm when hstack is active and the work splits into independent parts. The worker plans the split, several workers build the parts in parallel, and an independent reviewer tries to break the result.
+purpose: Finish large tasks faster without letting parallel work skip review.
+author: shellhaki
+version: 0.2.0
+disable-model-invocation: true
 ---
 
 # /hstack-swarm
 
-Use this for tasks that split into independent parts (separate modules, services or files). If hstack isn't active yet, run the `hstack-activate` flow first to get a worker model. Everything in the `hstack` skill still applies; only the build phase changes.
+Use this for tasks that split into independent parts (separate modules, services or files). If hstack isn't on yet, do the "Turning it on" steps in `hstack` first to get a worker model. Everything in the `hstack` skill still applies; only the build phase changes.
 
 1. **Brief** as in `hstack` section 1.
 
@@ -28,8 +32,19 @@ Use this for tasks that split into independent parts (separate modules, services
 
 5. **Independent review.** Start one `hstack-reviewer` on the worker model with the brief and the list of parts. It runs the full checks and tries to break the work with new tests, without fixing product code. It returns defects with file and line.
 
-6. **Fix.** Send each defect to the worker that owns that file (SendMessage), as one round of exact corrections.
+6. **Fix.** Send each defect to the worker that owns that file, as one round of exact corrections.
 
 7. **Review and report** as in `hstack` sections 4 and 5. Run the full done commands yourself once, and spot-check your RISKS.
+
+## In Muse Code
+Same steps, with `muse.workflow` (see "Delegation by harness" in `hstack`):
+- **Plan and part 0:** separate `agent()` children, the build child reading `.hstack/work/PLAN.md`.
+- **Fan out:** `parallel([...])` of one `agent()` per part, each with `isolation: true` so every part builds in its own worktree, `model: "<worker id>"`, and the part's instructions above.
+- **Review:** one `agent()` whose input starts with "Follow `<home>/agents/hstack-reviewer.md` as your instructions."
+- **Fix:** a new child per affected part, with that part's result `ref` and the exact corrections.
+- **Merge:** bring each part's worktree changes into your checkout, then run the full done commands once.
+
+## In Codex
+- **Parts and review:** spawn `hstack_worker` per part, in parallel, with `model: "<worker id>"`, and `hstack_reviewer` on the worker model for review, as in `hstack` ("Delegation by harness").
 
 Cost note: every part's tokens are at the worker's price. Your share is the brief, approvals and reviews. Keep the parts truly independent, so you never have to mediate conflicts.
